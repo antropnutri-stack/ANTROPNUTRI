@@ -29,6 +29,20 @@ export function MeasureForm({ campaignId, variables, ranges, profiles, groupCode
   const firstValRef = useRef<HTMLInputElement>(null)
   const toast = useToast()
 
+  // Medición que el evaluador está tomando (se recuerda en el dispositivo)
+  const SEL = 'antropnutri.variable'
+  const [current, setCurrent] = useState<Variable | null>(() => {
+    if (variables.length === 1) return variables[0]
+    try { const v = localStorage.getItem(SEL) as Variable | null; return v && variables.includes(v) ? v : null } catch { return null }
+  })
+  useEffect(() => { if (variables.length === 1) setCurrent(variables[0]) }, [variables])
+  function choose(v: Variable) {
+    setCurrent(v); setValues({}); setError('')
+    try { localStorage.setItem(SEL, v) } catch { /* */ }
+    setTimeout(() => (loaded ? firstValRef : numRef).current?.focus(), 50)
+  }
+  const currentMeta = VARIABLES.find((x) => x.key === current)
+
   useEffect(() => { numRef.current?.focus() }, [])
 
   async function lookup(e?: FormEvent) {
@@ -66,7 +80,7 @@ export function MeasureForm({ campaignId, variables, ranges, profiles, groupCode
   }
 
   const done = new Map(loaded?.measurements.map((m) => [m.variable, m]) ?? [])
-  const pendingVars = variables.filter((v) => !done.has(v))
+  const pendingVars = current && !done.has(current) ? [current] : []
 
   function submit(e: FormEvent) {
     e.preventDefault()
@@ -124,6 +138,20 @@ export function MeasureForm({ campaignId, variables, ranges, profiles, groupCode
   return (
     <div className="card">
       {toast.node}
+      {variables.length > 1 && (
+        <div style={{ marginBottom: '1rem' }}>
+          <label>¿Qué medición está tomando?</label>
+          <div className="var-picker">
+            {variables.map((v) => {
+              const m = VARIABLES.find((x) => x.key === v)!
+              return <button type="button" key={v} className={current === v ? 'primary' : ''} aria-pressed={current === v}
+                onClick={() => choose(v)}>{m.label}<small>{m.unit}</small></button>
+            })}
+          </div>
+        </div>
+      )}
+      {currentMeta && <p className="measuring">Midiendo: <strong>{currentMeta.label}</strong> ({currentMeta.unit})</p>}
+      {!current ? <p className="muted">Seleccione la medición para comenzar.</p> : <>
       <form onSubmit={lookup}>
         <label htmlFor="num">Número del participante</label>
         <div className="row">
@@ -157,19 +185,19 @@ export function MeasureForm({ campaignId, variables, ranges, profiles, groupCode
             </div>
           )}
           {!loaded.offline && (
-            <div className="checklist" style={{ marginBottom: '1rem' }}>
-              {VARIABLES.map((v) => <div key={v.key} className={done.has(v.key) ? 'done' : ''}>{done.has(v.key) ? '✓' : '○'} {v.short}{done.has(v.key) && `: ${Number(done.get(v.key)!.value)}`}</div>)}
-            </div>
+            <p className="muted" style={{ fontSize: '.85rem' }}>
+              Avance del participante: {done.size}/5{done.size > 0 && ' · ' + VARIABLES.filter((v) => done.has(v.key)).map((v) => `${v.short} ${Number(done.get(v.key)!.value)}`).join(' · ')}
+            </p>
           )}
           {pendingVars.length === 0 ? (
-            <div className="alert ok">Las mediciones de su estación ya están registradas para este participante.</div>
+            <div className="alert ok">{currentMeta!.label} ya está registrado para este participante{done.get(current!) ? `: ${Number(done.get(current!)!.value)} ${currentMeta!.unit}` : ''}{done.get(current!) && profiles.find((x) => x.id === done.get(current!)!.evaluator_id) ? ` (${profiles.find((x) => x.id === done.get(current!)!.evaluator_id)!.display_name})` : ''}.</div>
           ) : pendingVars.map((v, i) => {
             const meta = VARIABLES.find((x) => x.key === v)!
             const r = ranges.find((x) => x.variable === v)
             return (
               <div className="field" key={v}>
-                <label htmlFor={v}>{meta.label} ({meta.unit})</label>
-                <input id={v} ref={i === 0 ? firstValRef : undefined} className="huge" inputMode="decimal" autoComplete="off"
+                <label htmlFor="valor">{meta.label} ({meta.unit})</label>
+                <input id="valor" ref={i === 0 ? firstValRef : undefined} className="huge" inputMode="decimal" autoComplete="off"
                   value={values[v] ?? ''} onChange={(e) => setValues({ ...values, [v]: e.target.value.replace(/[^\d.,]/g, '') })}
                   placeholder={r ? `${r.warn_min}–${r.warn_max}` : ''} />
                 <small>Valor final validado según el protocolo de medición.</small>
@@ -183,6 +211,7 @@ export function MeasureForm({ campaignId, variables, ranges, profiles, groupCode
           </div>
         </form>
       )}
+      </>}
 
       {confirm && (
         <Modal title="Confirmar valor inusual" onClose={() => setConfirm(null)}>

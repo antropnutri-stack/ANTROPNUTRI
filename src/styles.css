@@ -116,6 +116,10 @@ tr.clickable { cursor: pointer; } tr.clickable:hover { background: var(--crema);
 .topbar .who { font-weight: 600; }
 .modal table td .row { flex-wrap: nowrap; gap: .3rem; }
 .modal table button { padding: .3rem .6rem; font-size: .85rem; }
+.var-picker { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: .5rem; }
+.var-picker button { flex-direction: column; padding: .9rem .6rem; min-height: 64px; font-size: 1rem; line-height: 1.2; }
+.var-picker button small { font-weight: 500; opacity: .8; font-size: .8rem; color: inherit; }
+.measuring { background: var(--beige); border-radius: 10px; padding: .5rem .75rem; color: var(--cafe-oscuro); }
 @media (max-width: 600px) {
   .topbar { gap: .5rem; padding: .5rem .75rem; }
   .topbar .who, .topbar .brand span.txt { display: none; }
