@@ -59,7 +59,7 @@ function UserForm({ cfg, target, isPrincipal, onClose, onSaved }: {
   const role: Role = isNew ? (target === 'new-admin' ? 'admin' : 'evaluador') : target.role
   const init = isNew ? null : target
   const [f, setF] = useState({
-    code: init?.code ?? nextCode(cfg.profiles, role === 'admin' ? 'ADM-' : 'EVA-'),
+    code: init?.code ?? nextCode(cfg.profiles, role === 'admin' ? 'ADM-' : 'NUT'),
     full_name: init?.full_name ?? '', display_name: init?.display_name ?? '',
     group_id: init?.group_id ?? '', station: (init?.station ?? '') as Station | '', status: init?.status ?? 'activa',
     password: '',

@@ -26,7 +26,7 @@ export default function Login() {
           {error && <div className="alert err">{error}</div>}
           <div className="field">
             <label htmlFor="code">Código de acceso</label>
-            <input id="code" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="EVA-001"
+            <input id="code" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="NUT001"
               autoCapitalize="characters" autoComplete="username" required />
           </div>
           <div className="field">
