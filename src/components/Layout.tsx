@@ -23,7 +23,7 @@ export default function Layout() {
   return (
     <>
       <header className="topbar">
-        <span className="brand"><img src="/nutria.svg" alt="" /><span className="txt">ANTROPNUTRI</span></span>
+        <span className="brand"><img src={`${import.meta.env.BASE_URL}nutria.svg`} alt="" /><span className="txt">ANTROPNUTRI</span></span>
         <span className="spacer" />
         <span className={`sync ${sync.cls}`} title="Estado de sincronización">{sync.text}</span>
         <span className="who">{profile?.display_name}</span>

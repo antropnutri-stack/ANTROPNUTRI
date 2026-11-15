@@ -228,7 +228,7 @@ $$;
 
 -- Variables que corresponden a cada estación
 create or replace function station_variables(s station) returns variable[]
-language sql immutable as $$
+language sql immutable set search_path = public as $$
   select case s
     when 'peso' then array['peso']::variable[]
     when 'talla' then array['talla']::variable[]
@@ -263,7 +263,7 @@ $$;
 -- Indicadores derivados
 -- =====================================================================
 create or replace function bmi_class(bmi numeric, age int) returns text
-language sql immutable as $$
+language sql immutable set search_path = public as $$
   select case
     when bmi is null then null
     when age is not null and age < 18 then 'No aplica (menor de 18)'
@@ -515,7 +515,7 @@ end $$;
 create or replace function import_participants(p_rows jsonb) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare camp uuid := active_campaign(); r jsonb; gid uuid; n int; inserted int := 0; errors jsonb := '[]';
-  idx int := 0; default_group uuid;
+  idx int := 0;
 begin
   if not has_perm('manage_participants') then raise exception 'NO_AUTORIZADO'; end if;
   if camp is null then raise exception 'SIN_CAMPAÑA'; end if;
@@ -523,6 +523,7 @@ begin
   for r in select * from jsonb_array_elements(p_rows) loop
     idx := idx + 1;
     begin
+      gid := null;
       n := nullif(r->>'number','')::int;
       if nullif(r->>'group_code','') is not null then
         select id into gid from groups where campaign_id = camp and code = upper(r->>'group_code');
@@ -669,6 +670,7 @@ language plpgsql security definer set search_path = public as $$
 declare target profiles; caller profiles;
 begin
   select * into caller from profiles where id = auth.uid() and status = 'activa';
+  if not found then raise exception 'NO_AUTORIZADO'; end if;
   select * into target from profiles where id = p_id for update;
   if not found then raise exception 'NO_ENCONTRADO'; end if;
   if target.role = 'principal' and caller.id <> target.id then raise exception 'NO_AUTORIZADO'; end if;

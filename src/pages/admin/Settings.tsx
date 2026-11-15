@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { q, useConfig } from '../../lib/hooks'
 import { supabase, errorMessage } from '../../lib/supabase'
 import { VARIABLES, pad, type Campaign, type Group, type Range } from '../../lib/types'
@@ -87,7 +88,7 @@ export default function Settings() {
       </div>
       <div className="card">
         <h2>Autorizadores</h2>
-        <p>Los autorizadores son los administradores con el permiso «Resolver solicitudes». Actívelo o desactívelo desde <a href="/usuarios">Usuarios</a>. Actualmente: <strong>{cfg.profiles.filter((p) => p.status === 'activa' && p.role === 'admin' && p.can_resolve_requests).map((p) => p.display_name).join(', ') || 'ninguno'}</strong> (además de la cuenta principal).</p>
+        <p>Los autorizadores son los administradores con el permiso «Resolver solicitudes». Actívelo o desactívelo desde <Link to="/usuarios">Usuarios</Link>. Actualmente: <strong>{cfg.profiles.filter((p) => p.status === 'activa' && p.role === 'admin' && p.can_resolve_requests).map((p) => p.display_name).join(', ') || 'ninguno'}</strong> (además de la cuenta principal).</p>
       </div>
     </>
   )
