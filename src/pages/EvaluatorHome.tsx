@@ -4,7 +4,7 @@ import { fetchAll, useConfig, useLive, useQueue } from '../lib/hooks'
 import { discardOp, retryOp } from '../lib/offlineQueue'
 import { supabase, errorMessage } from '../lib/supabase'
 import { REQUEST_TYPE_LABEL, STATUS_LABEL, VARIABLES, pad, stationOf, varLabel,
-  type Measurement, type Participant, type ParticipantResult, type SupportRequest } from '../lib/types'
+  type Measurement, type Participant, type ParticipantResult, type SupportRequest, type Variable } from '../lib/types'
 import { MeasureForm, cacheParticipants } from '../components/MeasureForm'
 import { RegisterParticipant } from '../components/RegisterParticipant'
 import { SupportRequestForm } from '../components/SupportRequestForm'
@@ -13,7 +13,7 @@ import { Bar, Stat, StatusBadge, useToast } from '../components/ui'
 export default function EvaluatorHome() {
   const { profile } = useAuth()
   const { data: cfg } = useConfig()
-  const [support, setSupport] = useState<{ number?: number } | null>(null)
+  const [support, setSupport] = useState<{ number?: number; type?: 'remedicion'; variable?: Variable } | null>(null)
   const queue = useQueue()
   const toast = useToast()
   const st = stationOf(profile!.station)
@@ -60,9 +60,10 @@ export default function EvaluatorHome() {
           <QueuePanel queue={queue} />
 
           {supportIn.length > 0 && (
-            <div className="alert info">Apoyo autorizado para su grupo: {supportIn.map((r) => {
+            <div className="alert info">Autorizado para su grupo: {supportIn.map((r) => {
               const p = data!.participants.find((x) => x.id === r.participant_id)
-              return `${p ? pad(p.number) : '?'} (${r.variables.map((v) => VARIABLES.find((x) => x.key === v)!.short).join(', ')})`
+              const vs = r.variables.filter((v) => !(r.done_variables ?? []).includes(v))
+              return `${p ? pad(p.number) : '?'} (${r.type === 'remedicion' ? 'volver a medir ' : ''}${vs.map((v) => VARIABLES.find((x) => x.key === v)!.short).join(', ')})`
             }).join(' · ')}</div>
           )}
 
@@ -72,7 +73,7 @@ export default function EvaluatorHome() {
             </div>
           ) : (
             <MeasureForm campaignId={cfg.campaign?.id ?? ''} variables={vars} ranges={cfg.ranges} profiles={cfg.profiles} groupCode={groupCode}
-              onRequestSupport={(n) => setSupport({ number: n })} />
+              onRequestSupport={(n, o) => setSupport({ number: n, ...o })} />
           )}
 
           <div className="row" style={{ marginBottom: '1rem' }}>
@@ -90,6 +91,7 @@ export default function EvaluatorHome() {
 
       {support && (
         <SupportRequestForm groups={cfg.groups} ownGroupId={profile.group_id} initialNumber={support.number}
+          initialType={support.type} initialVariable={support.variable}
           onClose={() => setSupport(null)}
           onDone={() => { setSupport(null); toast.show('ok', 'Solicitud enviada a los administradores autorizadores.') }} />
       )}

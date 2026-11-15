@@ -18,7 +18,7 @@ export interface QueuedOp {
 }
 
 export type SaveResult =
-  | { status: 'guardado' | 'ya_guardado'; id: string; unusual?: boolean }
+  | { status: 'guardado' | 'ya_guardado'; id: string; unusual?: boolean; remedicion?: boolean; old_value?: number }
   | { status: 'ya_existe'; id: string; value: number; evaluator_id: string }
   | { status: 'requiere_confirmacion'; warn_min: number; warn_max: number; unit: string }
 

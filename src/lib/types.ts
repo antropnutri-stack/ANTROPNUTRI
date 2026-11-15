@@ -2,7 +2,7 @@ export type Role = 'principal' | 'admin' | 'evaluador'
 export type AccountStatus = 'activa' | 'suspendida' | 'desactivada'
 export type Station = 'registro' | 'peso' | 'talla' | 'cintura' | 'brazo' | 'supervision'
 export type Variable = 'peso' | 'talla' | 'cintura' | 'perimetro_braquial' | 'pliegue_tricipital'
-export type RequestType = 'apoyo_temporal' | 'apoyo_varias' | 'traslado'
+export type RequestType = 'apoyo_temporal' | 'apoyo_varias' | 'traslado' | 'remedicion'
 export type RequestStatus = 'pendiente' | 'aprobada' | 'rechazada' | 'cancelada' | 'finalizada'
 export type EvalStatus = 'sin_iniciar' | 'en_proceso' | 'completo' | 'requiere_revision'
 
@@ -56,7 +56,7 @@ export interface ParticipantResult {
 
 export interface SupportRequest {
   id: string; participant_id: string; type: RequestType; reason: string; origin_group_id: string; target_group_id: string
-  variables: Variable[]; status: RequestStatus; requested_by: string; resolved_by: string | null
+  variables: Variable[]; done_variables?: Variable[]; status: RequestStatus; requested_by: string; resolved_by: string | null
   resolved_at: string | null; resolution_note: string | null; created_at: string
 }
 
@@ -86,6 +86,7 @@ export const STATUS_LABEL: Record<EvalStatus, string> = {
 }
 export const REQUEST_TYPE_LABEL: Record<RequestType, string> = {
   apoyo_temporal: 'Apoyo temporal', apoyo_varias: 'Apoyo para varias mediciones', traslado: 'Traslado permanente',
+  remedicion: 'Volver a medir',
 }
 export const REQUEST_STATUS_LABEL: Record<RequestStatus, string> = {
   pendiente: 'Pendiente', aprobada: 'Aprobada', rechazada: 'Rechazada', cancelada: 'Cancelada', finalizada: 'Finalizada',

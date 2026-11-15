@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase'
 import type { AuditEntry } from '../../lib/types'
 
 const ACTION_LABEL: Record<string, string> = {
-  medicion_registrada: 'Medición registrada', medicion_corregida: 'Medición corregida', medicion_anulada: 'Medición anulada',
+  medicion_registrada: 'Medición registrada', medicion_corregida: 'Medición corregida', medicion_repetida: 'Medición repetida (autorizada)', medicion_anulada: 'Medición anulada',
   participante_registrado: 'Participante registrado', participantes_importados: 'Importación Excel', participante_corregido: 'Participante corregido',
   cambio_grupo: 'Cambio de grupo', solicitud_creada: 'Solicitud creada', solicitud_aprobada: 'Solicitud aprobada',
   solicitud_rechazada: 'Solicitud rechazada', solicitud_cancelada: 'Solicitud cancelada', cuenta_creada: 'Cuenta creada',

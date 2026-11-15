@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { supabase, errorMessage } from '../lib/supabase'
 import { saveMeasurement } from '../lib/offlineQueue'
 import { ageFrom, cmb, imc, rct } from '../lib/calc'
-import { VARIABLES, pad, type Measurement, type Participant, type Profile, type Range, type Variable } from '../lib/types'
+import { VARIABLES, pad, type Measurement, type Participant, type Profile, type Range, type SupportRequest, type Variable } from '../lib/types'
 import { Modal, useToast } from './ui'
 
 const CACHE = 'antropnutri.participants'
@@ -13,10 +13,10 @@ interface Props {
   ranges: Range[]
   profiles: Profile[]
   groupCode: (id: string) => string
-  onRequestSupport?: (number: number) => void
+  onRequestSupport?: (number: number, opts?: { type: 'remedicion'; variable: Variable }) => void
 }
 
-type Loaded = { participant: Participant | null; measurements: Measurement[]; offline: boolean }
+type Loaded = { participant: Participant | null; measurements: Measurement[]; requests: SupportRequest[]; offline: boolean }
 
 export function MeasureForm({ campaignId, variables, ranges, profiles, groupCode, onRequestSupport }: Props) {
   const [numberText, setNumberText] = useState('')
@@ -54,18 +54,23 @@ export function MeasureForm({ campaignId, variables, ranges, profiles, groupCode
       const { data: p, error: pe } = await supabase.from('participants').select('*').eq('campaign_id', campaignId).eq('number', n).maybeSingle()
       if (pe) throw pe
       let ms: Measurement[] = []
+      let rs: SupportRequest[] = []
       if (p) {
-        const { data, error: me } = await supabase.from('measurements').select('*').eq('participant_id', p.id)
-        if (me) throw me
-        ms = data as Measurement[]
+        const [m, r] = await Promise.all([
+          supabase.from('measurements').select('*').eq('participant_id', p.id),
+          supabase.from('support_requests').select('*').eq('participant_id', p.id).eq('type', 'remedicion').in('status', ['pendiente', 'aprobada']),
+        ])
+        if (m.error) throw m.error
+        ms = m.data as Measurement[]
+        rs = (r.data as SupportRequest[] | null) ?? []
       }
-      setLoaded({ participant: p as Participant | null, measurements: ms, offline: false })
+      setLoaded({ participant: p as Participant | null, measurements: ms, requests: rs, offline: false })
     } catch (err) {
       // Sin conexión: verificar con la lista guardada en el dispositivo
       let cached: Participant | undefined
       try { cached = (JSON.parse(localStorage.getItem(CACHE) ?? '[]') as Participant[]).find((x) => x.number === n) } catch { /* */ }
       if (errorMessage(err).startsWith('Sin conexión') || !navigator.onLine) {
-        setLoaded({ participant: cached ?? null, measurements: [], offline: true })
+        setLoaded({ participant: cached ?? null, measurements: [], requests: [], offline: true })
       } else setError(errorMessage(err))
     } finally {
       setBusy(false)
@@ -80,7 +85,12 @@ export function MeasureForm({ campaignId, variables, ranges, profiles, groupCode
   }
 
   const done = new Map(loaded?.measurements.map((m) => [m.variable, m]) ?? [])
-  const pendingVars = current && !done.has(current) ? [current] : []
+  // Re-medición autorizada para la variable actual (o en trámite)
+  const redo = current ? loaded?.requests.find((r) => r.status === 'aprobada' && r.variables.includes(current) && !(r.done_variables ?? []).includes(current)) : undefined
+  const redoPending = current ? loaded?.requests.find((r) => r.status === 'pendiente' && r.variables.includes(current)) : undefined
+  const pendingVars = current && (!done.has(current) || redo) ? [current] : []
+  const prev = current ? done.get(current) : undefined
+  const prevWho = prev ? profiles.find((x) => x.id === prev.evaluator_id)?.display_name : undefined
 
   function submit(e: FormEvent) {
     e.preventDefault()
@@ -106,7 +116,7 @@ export function MeasureForm({ campaignId, variables, ranges, profiles, groupCode
   async function doSave(items: { v: Variable; value: number }[], confirmUnusual: boolean) {
     setConfirm(null); setBusy(true)
     const n = parseInt(numberText, 10)
-    let pending = 0, saved = 0
+    let pending = 0, saved = 0, redone = 0
     const problems: string[] = []
     for (const it of items) {
       try {
@@ -117,13 +127,14 @@ export function MeasureForm({ campaignId, variables, ranges, profiles, groupCode
           const who = profiles.find((p) => p.id === evaluatorId)?.display_name
           problems.push(`${VARIABLES.find((x) => x.key === it.v)!.short}: ya registrado (${r.result.value})${who ? ' por ' + who : ''}. Solicite corrección a administración si es necesario.`)
         } else if (r.result?.status === 'requiere_confirmacion') problems.push('El servidor requiere confirmar un valor inusual.')
-        else saved++
+        else { saved++; if (r.result?.status === 'guardado' && r.result.remedicion) redone++ }
       } catch (err) { problems.push(errorMessage(err)) }
     }
     setBusy(false)
     if (problems.length) { setError(problems.join(' ')); if (!saved && !pending) return }
     toast.show(pending ? 'warn' : 'ok', pending
       ? `Participante ${pad(n)}: ${pending} guardado(s) en el dispositivo, pendiente de sincronizar.`
+      : redone ? `Participante ${pad(n)}: medición repetida y guardada (reemplaza el valor anterior).`
       : `Participante ${pad(n)}: ${saved} medición(es) guardada(s) en servidor.`)
     if (!problems.length) reset()
   }
@@ -190,13 +201,23 @@ export function MeasureForm({ campaignId, variables, ranges, profiles, groupCode
             </p>
           )}
           {pendingVars.length === 0 ? (
-            <div className="alert ok">{currentMeta!.label} ya está registrado para este participante{done.get(current!) ? `: ${Number(done.get(current!)!.value)} ${currentMeta!.unit}` : ''}{done.get(current!) && profiles.find((x) => x.id === done.get(current!)!.evaluator_id) ? ` (${profiles.find((x) => x.id === done.get(current!)!.evaluator_id)!.display_name})` : ''}.</div>
+            <div className="alert ok">
+              {currentMeta!.label} ya está registrado para este participante{prev ? `: ${Number(prev.value)} ${currentMeta!.unit}` : ''}{prevWho ? ` (${prevWho})` : ''}.
+              {redoPending ? (
+                <div style={{ marginTop: '.5rem' }}><span className="badge warn">Solicitud para volver a medir pendiente de aprobación</span></div>
+              ) : onRequestSupport && p && (
+                <div style={{ marginTop: '.6rem' }}>
+                  <button type="button" onClick={() => onRequestSupport(p.number, { type: 'remedicion', variable: current! })}>Solicitar volver a medir</button>
+                </div>
+              )}
+            </div>
           ) : pendingVars.map((v, i) => {
             const meta = VARIABLES.find((x) => x.key === v)!
             const r = ranges.find((x) => x.variable === v)
             return (
               <div className="field" key={v}>
-                <label htmlFor="valor">{meta.label} ({meta.unit})</label>
+                {redo && prev && <div className="alert warn">Re-medición autorizada. El valor anterior ({Number(prev.value)} {meta.unit}{prevWho ? `, ${prevWho}` : ''}) será reemplazado y quedará en el historial.</div>}
+                <label htmlFor="valor">{redo ? 'Nuevo valor · ' : ''}{meta.label} ({meta.unit})</label>
                 <input id="valor" ref={i === 0 ? firstValRef : undefined} className="huge" inputMode="decimal" autoComplete="off"
                   value={values[v] ?? ''} onChange={(e) => setValues({ ...values, [v]: e.target.value.replace(/[^\d.,]/g, '') })}
                   placeholder={r ? `${r.warn_min}–${r.warn_max}` : ''} />

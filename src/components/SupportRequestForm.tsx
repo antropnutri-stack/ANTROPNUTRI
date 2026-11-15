@@ -3,13 +3,21 @@ import { supabase, errorMessage } from '../lib/supabase'
 import { REQUEST_TYPE_LABEL, VARIABLES, type Group, type RequestType, type Variable } from '../lib/types'
 import { Modal } from './ui'
 
-export function SupportRequestForm({ groups, ownGroupId, initialNumber, onClose, onDone }: {
-  groups: Group[]; ownGroupId: string | null; initialNumber?: number; onClose: () => void; onDone: () => void
+export function SupportRequestForm({ groups, ownGroupId, initialNumber, initialType, initialVariable, onClose, onDone }: {
+  groups: Group[]; ownGroupId: string | null; initialNumber?: number; initialType?: RequestType; initialVariable?: Variable
+  onClose: () => void; onDone: () => void
 }) {
   const [number, setNumber] = useState(initialNumber ? String(initialNumber) : '')
-  const [type, setType] = useState<RequestType>('apoyo_temporal')
-  const [target, setTarget] = useState(groups.find((g) => g.id !== ownGroupId)?.id ?? '')
-  const [vars, setVars] = useState<Variable[]>([])
+  const [type, setTypeRaw] = useState<RequestType>(initialType ?? 'apoyo_temporal')
+  const otherGroup = groups.find((g) => g.id !== ownGroupId)?.id ?? ''
+  const [target, setTarget] = useState(initialType === 'remedicion' ? (ownGroupId ?? '') : otherGroup)
+  const [vars, setVars] = useState<Variable[]>(initialVariable ? [initialVariable] : [])
+  const setType = (t: RequestType) => {
+    setTypeRaw(t)
+    if (t === 'remedicion') setTarget(ownGroupId ?? '')
+    else if (target === ownGroupId) setTarget(otherGroup)
+    if (t === 'apoyo_temporal' && vars.length > 1) setVars(vars.slice(0, 1))
+  }
   const [reason, setReason] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -29,7 +37,7 @@ export function SupportRequestForm({ groups, ownGroupId, initialNumber, onClose,
   }
 
   return (
-    <Modal title="Solicitar apoyo" onClose={onClose}>
+    <Modal title={type === 'remedicion' ? 'Solicitar volver a medir' : 'Solicitar apoyo'} onClose={onClose}>
       <form onSubmit={submit}>
         {error && <div className="alert err">{error}</div>}
         <div className="field">
@@ -41,17 +49,20 @@ export function SupportRequestForm({ groups, ownGroupId, initialNumber, onClose,
           <select value={type} onChange={(e) => setType(e.target.value as RequestType)}>
             {Object.entries(REQUEST_TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
-          <small>{type === 'traslado' ? 'Cambia el grupo asignado; el número se conserva.' : 'El participante conserva su grupo; otro grupo realiza solo las mediciones autorizadas.'}</small>
+          <small>{type === 'traslado' ? 'Cambia el grupo asignado; el número se conserva.'
+            : type === 'remedicion' ? 'Para repetir una medición ya registrada. Al aprobarse, el nuevo valor reemplaza al anterior (que queda en el historial).'
+            : 'El participante conserva su grupo; otro grupo realiza solo las mediciones autorizadas.'}</small>
         </div>
         <div className="field">
-          <label>Grupo de destino</label>
+          <label>{type === 'remedicion' ? '¿Quién vuelve a medir?' : 'Grupo de destino'}</label>
           <select value={target} onChange={(e) => setTarget(e.target.value)} required>
-            {groups.filter((g) => g.id !== ownGroupId).map((g) => <option key={g.id} value={g.id}>Grupo {g.code}</option>)}
+            {groups.filter((g) => type === 'remedicion' || g.id !== ownGroupId).map((g) => (
+              <option key={g.id} value={g.id}>Grupo {g.code}{g.id === ownGroupId ? ' (mi grupo)' : ''}</option>))}
           </select>
         </div>
         {type !== 'traslado' && (
           <div className="field">
-            <label>Mediciones a autorizar</label>
+            <label>{type === 'remedicion' ? 'Mediciones a repetir' : 'Mediciones a autorizar'}</label>
             {VARIABLES.map((v) => (
               <label key={v.key} className="check">
                 <input type={type === 'apoyo_temporal' ? 'radio' : 'checkbox'} name="vars" checked={vars.includes(v.key)}
@@ -59,13 +70,13 @@ export function SupportRequestForm({ groups, ownGroupId, initialNumber, onClose,
                 {v.label}
               </label>
             ))}
-            <small>Solo se habilitarán las mediciones que aún estén pendientes.</small>
+            <small>{type === 'remedicion' ? 'Solo se pueden repetir mediciones ya registradas.' : 'Solo se habilitarán las mediciones que aún estén pendientes.'}</small>
           </div>
         )}
         <div className="field">
           <label>Motivo</label>
           <textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} required minLength={3}
-            placeholder="Ej.: balanza en calibración, cola excesiva en la estación…" />
+            placeholder={type === 'remedicion' ? 'Ej.: el participante se movió, lectura dudosa, error de digitación…' : 'Ej.: balanza en calibración, cola excesiva en la estación…'} />
         </div>
         <div className="row">
           <button className="primary grow" disabled={busy}>{busy ? 'Enviando…' : 'Enviar solicitud'}</button>

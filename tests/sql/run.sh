@@ -11,5 +11,5 @@ $AS $BIN/pg_ctl -D "$DIR" -o "-p $PORT -k $DIR" -l "$DIR/log" -w start >/dev/nul
 P="psql -h $DIR -p $PORT -U postgres -v ON_ERROR_STOP=1 -q"
 $P -c "create database t"
 $P -d t -f tests/sql/stub_supabase.sql
-$P -d t -f supabase/migrations/0001_init.sql
+for f in supabase/migrations/*.sql; do $P -d t -f "$f"; done
 $P -d t -f tests/sql/test_rules.sql >/dev/null

@@ -112,6 +112,36 @@ select pg_temp.check((select count(*) from audit_log where action='medicion_corr
 select pg_temp.check((import_participants('[{"full_name":"Ana Uno","sex":"F","age":19},{"full_name":"Beto Dos","sex":"M","birth_date":"2003-05-05","group_code":"C"},{"full_name":"Mal","sex":"X","age":20}]'))->>'inserted'='2', 'importa 2 de 3 y reporta error');
 select pg_temp.check((select min(number) from participants p join groups g on g.id=p.group_id where g.code='C')=201, 'importado en grupo C con número 201');
 
+
+-- ===== Volver a medir con autorización =====
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000a1');
+select pg_temp.check((save_measurement(1,'peso',69.5))->>'status'='ya_existe', 'sin autorización no se repite');
+select pg_temp.fails($$select create_support_request(1,'apoyo_temporal','repetir',(select id from groups where code='B'),array['peso']::variable[])$$, 'Volver a medir', 'apoyo no sirve para medición ya hecha (sugiere volver a medir)');
+select pg_temp.fails($$select create_support_request(3,'remedicion','No hay cintura',null,array['cintura']::variable[])$$, 'SIN_MEDICIONES', 'no se pide volver a medir algo no medido');
+select create_support_request(1,'remedicion','Participante se movió en la balanza',null,array['peso']::variable[]) as rq \gset
+select pg_temp.check((select target_group_id = origin_group_id from support_requests where id=:'rq'), 're-medición dentro del mismo grupo');
+select pg_temp.check((save_measurement(1,'peso',69.5))->>'status'='ya_existe', 'pendiente de aprobación: aún no se repite');
+select pg_temp.as_user('00000000-0000-0000-0000-000000000002');
+select resolve_support_request(:'rq', true);
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000a1');
+select pg_temp.check((save_measurement(1,'peso',69.5))->>'remedicion'='true', 'aprobada: se repite la medición');
+select pg_temp.check((select value from measurements m join participants p on p.id=m.participant_id where p.number=1 and variable='peso')=69.5, 'nuevo valor guardado');
+select pg_temp.check((select status from support_requests where id=:'rq')='finalizada', 're-medición finaliza al completarse');
+select pg_temp.check((save_measurement(1,'peso',71))->>'status'='ya_existe', 'la autorización se usa una sola vez');
+reset role;
+select pg_temp.check((select (details->>'old')::numeric = 68.7 and (details->>'new')::numeric = 69.5 from audit_log where action='medicion_repetida' order by id desc limit 1), 'auditoría guarda valor anterior y nuevo');
+set role authenticated;
+-- una re-medición aprobada no se cierra sola cuando se registran otras variables
+select create_support_request(3,'remedicion','Lectura dudosa',null,array['peso']::variable[]) as rq2 \gset
+select pg_temp.as_user('00000000-0000-0000-0000-000000000001');
+select resolve_support_request(:'rq2', true);
+select save_measurement(3,'cintura',80);
+select pg_temp.check((select status from support_requests where id=:'rq2')='aprobada', 'otra medición no cierra la re-medición');
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000a1');
+select pg_temp.check((save_measurement(3,'peso',73))->>'status'='guardado', 'estación del grupo repite el peso');
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000b1');
+select pg_temp.check((select count(*) from participants where number=3)=0, 'otro grupo no ve la re-medición interna');
+
 -- Evaluador no ve auditoría
 select pg_temp.as_user('00000000-0000-0000-0000-0000000000a1');
 select pg_temp.check((select count(*) from audit_log)=0, 'evaluador no ve auditoría');

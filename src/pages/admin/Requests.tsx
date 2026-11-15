@@ -52,8 +52,11 @@ export default function Requests() {
             <strong className="grow" style={{ fontSize: '1.1rem' }}>Participante {num(r.participant_id) ? pad(num(r.participant_id)!) : '—'} · {REQUEST_TYPE_LABEL[r.type]}</strong>
             <StatusBadge estado={r.status} />
           </div>
-          <p style={{ margin: '.4rem 0' }}>Grupo {grp(r.origin_group_id)} → Grupo {grp(r.target_group_id)}
-            {r.variables.length > 0 && <> · {r.variables.map(varLabel).join(', ')}</>}</p>
+          <p style={{ margin: '.4rem 0' }}>{r.type === 'remedicion' && r.origin_group_id === r.target_group_id ? `Grupo ${grp(r.origin_group_id)} (mismo grupo)` : `Grupo ${grp(r.origin_group_id)} → Grupo ${grp(r.target_group_id)}`}
+            {r.variables.length > 0 && <> · {r.variables.map((v) => {
+              const m = r.type === 'remedicion' ? data.measurements.find((x) => x.participant_id === r.participant_id && x.variable === v) : undefined
+              return varLabel(v) + (m ? ` (valor actual: ${Number(m.value)})` : '')
+            }).join(', ')}</>}</p>
           <p className="muted" style={{ margin: 0 }}>Motivo: {r.reason}</p>
           <small className="muted">Solicitó {who(r.requested_by)} · {new Date(r.created_at).toLocaleTimeString('es-PE')}
             {r.resolved_by && <> · Resolvió {who(r.resolved_by)} {r.resolved_at && new Date(r.resolved_at).toLocaleTimeString('es-PE')}</>}
