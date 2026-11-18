@@ -254,7 +254,7 @@ export async function exportWorkbook(d: ExportData) {
   wsum.columns = [{ header: 'Indicador', width: 30 }, { header: 'n', width: 8 }, { header: 'Media', width: 10 },
     { header: 'DE', width: 10 }, { header: 'Mínimo', width: 10 }, { header: 'Máximo', width: 10 }]
   const cols: [string, keyof ParticipantResult][] = [['Peso (kg)', 'peso'], ['Talla (cm)', 'talla'], ['Cintura (cm)', 'cintura'],
-    ['Perímetro de bíceps (cm)', 'perimetro_braquial'], ['Perímetro de cadera (cm)', 'cadera'],
+    ['Perímetro abdominal (cm)', 'perimetro_abdominal'], ['Perímetro de bíceps (cm)', 'perimetro_braquial'], ['Perímetro de cadera (cm)', 'cadera'],
     ['Pliegue tricipital (mm)', 'pliegue_tricipital'], ['Pliegue subescapular (mm)', 'pliegue_subescapular'],
     ['Pliegue suprailíaco (mm)', 'pliegue_suprailiaco'], ['Pliegue bicipital (mm)', 'pliegue_bicipital'],
     ['IMC (kg/m²)', 'imc'], ['Relación cintura/talla', 'rct'], ['Índice cintura/cadera', 'icc'],

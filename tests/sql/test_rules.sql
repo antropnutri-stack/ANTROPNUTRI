@@ -40,13 +40,13 @@ select pg_temp.check((save_measurement(2,'cadera',95))->>'status'='guardado', 'e
 select pg_temp.as_user('00000000-0000-0000-0000-0000000000a2');
 select pg_temp.check((select count(*) from participants)=2, 'evaluador ve a todos los participantes');
 select pg_temp.check((save_measurement(1,'peso',68.5))->>'status'='guardado', 'peso');
-select save_measurement(1,'talla',170), save_measurement(1,'cintura',78), save_measurement(1,'perimetro_braquial',29),
+select save_measurement(1,'talla',170), save_measurement(1,'cintura',78), save_measurement(1,'perimetro_abdominal',82), save_measurement(1,'perimetro_braquial',29),
        save_measurement(1,'cadera',96), save_measurement(1,'pliegue_tricipital',12), save_measurement(1,'pliegue_subescapular',14),
        save_measurement(1,'pliegue_suprailiaco',16), save_measurement(1,'pliegue_bicipital',6);
 select pg_temp.check((save_measurement(1,'peso',70))->>'remedicion'='true', 'repetir una medida la reemplaza sin solicitud');
 select pg_temp.check((select value from measurements m join participants p on p.id=m.participant_id where p.number=1 and m.variable='peso')=70, 'nuevo valor guardado');
 select save_measurement(1,'peso',68.5);
-select pg_temp.check((select estado from participant_results where number=1)='completo', 'completo con 9 mediciones');
+select pg_temp.check((select estado from participant_results where number=1)='completo', 'completo con 10 mediciones');
 select pg_temp.check((select imc from participant_results where number=1)=23.7, 'IMC 23.7');
 select pg_temp.check((select icc from participant_results where number=1)=0.813, 'ICC 0.813');
 select pg_temp.check((select suma_pliegues from participant_results where number=1)=48, 'suma de 4 pliegues 48');

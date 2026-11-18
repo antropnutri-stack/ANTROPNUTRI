@@ -1,7 +1,7 @@
 export type Role = 'principal' | 'admin' | 'evaluador'
 export type AccountStatus = 'activa' | 'suspendida' | 'desactivada'
 export type Station = 'registro' | 'peso' | 'talla' | 'cintura' | 'brazo' | 'supervision'
-export type Variable = 'peso' | 'talla' | 'cintura' | 'perimetro_braquial' | 'cadera'
+export type Variable = 'peso' | 'talla' | 'cintura' | 'perimetro_abdominal' | 'perimetro_braquial' | 'cadera'
   | 'pliegue_tricipital' | 'pliegue_subescapular' | 'pliegue_suprailiaco' | 'pliegue_bicipital'
 export type RequestType = 'apoyo_temporal' | 'apoyo_varias' | 'traslado' | 'remedicion'
 export type RequestStatus = 'pendiente' | 'aprobada' | 'rechazada' | 'cancelada' | 'finalizada'
@@ -50,7 +50,7 @@ export interface Range {
 export interface ParticipantResult {
   id: string; campaign_id: string; number: number; full_name: string; dni: string | null; sex: 'M' | 'F' | null; birth_date: string | null; age: number | null
   group_id: string; group_code: string; needs_review: boolean; review_note: string | null; event_date: string
-  peso: number | null; talla: number | null; cintura: number | null; perimetro_braquial: number | null; cadera: number | null
+  peso: number | null; talla: number | null; cintura: number | null; perimetro_abdominal: number | null; perimetro_braquial: number | null; cadera: number | null
   pliegue_tricipital: number | null; pliegue_subescapular: number | null; pliegue_suprailiaco: number | null; pliegue_bicipital: number | null
   n_measurements: number; any_unusual: boolean; imc: number | null; imc_clasificacion: string | null
   rct: number | null; icc: number | null; cmb: number | null; suma_pliegues: number | null; estado: EvalStatus
@@ -68,6 +68,7 @@ export const VARIABLES: { key: Variable; label: string; short: string; unit: str
   { key: 'peso', label: 'Peso corporal', short: 'Peso', unit: 'kg' },
   { key: 'talla', label: 'Talla', short: 'Talla', unit: 'cm' },
   { key: 'cintura', label: 'Perímetro de cintura', short: 'Cintura', unit: 'cm' },
+  { key: 'perimetro_abdominal', label: 'Perímetro abdominal', short: 'Abdomen', unit: 'cm' },
   { key: 'perimetro_braquial', label: 'Perímetro de bíceps', short: 'Bíceps', unit: 'cm' },
   { key: 'cadera', label: 'Perímetro de cadera', short: 'Cadera', unit: 'cm' },
   { key: 'pliegue_tricipital', label: 'Pliegue tricipital', short: 'P. tricip.', unit: 'mm' },
