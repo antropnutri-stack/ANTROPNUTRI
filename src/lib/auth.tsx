@@ -38,10 +38,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (code: string, password: string) => {
     const email = codeToEmail(code)
-    let { error } = await supabase.auth.signInWithPassword({ email, password })
-    // Contraseñas tipo apellido: se aceptan en mayúsculas/minúsculas y con o sin tildes
-    if (error && normalize(password) !== password) {
-      ({ error } = await supabase.auth.signInWithPassword({ email, password: normalize(password) }))
+    // Contraseñas tipo apellido: se guardan en minúsculas y sin tildes, así que se prueba
+    // primero la versión normalizada (un solo intento en casi todos los casos) y, solo si
+    // falla y es distinta, la contraseña tal como se escribió.
+    const first = normalize(password)
+    let { error } = await supabase.auth.signInWithPassword({ email, password: first })
+    if (error && first !== password) {
+      ({ error } = await supabase.auth.signInWithPassword({ email, password }))
     }
     if (error) throw error
   }
