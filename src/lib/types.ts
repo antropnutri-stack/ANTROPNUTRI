@@ -68,7 +68,7 @@ export const VARIABLES: { key: Variable; label: string; short: string; unit: str
   { key: 'peso', label: 'Peso corporal', short: 'Peso', unit: 'kg' },
   { key: 'talla', label: 'Talla', short: 'Talla', unit: 'cm' },
   { key: 'cintura', label: 'Perímetro de cintura', short: 'Cintura', unit: 'cm' },
-  { key: 'perimetro_abdominal', label: 'Perímetro abdominal', short: 'Abdomen', unit: 'cm' },
+  { key: 'perimetro_abdominal', label: 'Perímetro abdominal', short: 'P. abdominal', unit: 'cm' },
   { key: 'perimetro_braquial', label: 'Perímetro de bíceps', short: 'Bíceps', unit: 'cm' },
   { key: 'cadera', label: 'Perímetro de cadera', short: 'Cadera', unit: 'cm' },
   { key: 'pliegue_tricipital', label: 'Pliegue tricipital', short: 'P. tricip.', unit: 'mm' },
