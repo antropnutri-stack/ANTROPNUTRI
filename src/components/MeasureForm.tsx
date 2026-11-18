@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { supabase, errorMessage } from '../lib/supabase'
 import { saveMeasurement } from '../lib/offlineQueue'
-import { ageFrom, cmb, imc, rct } from '../lib/calc'
-import { VARIABLES, pad, type Measurement, type Participant, type Profile, type Range, type SupportRequest, type Variable } from '../lib/types'
+import { ageFrom } from '../lib/calc'
+import { N_VARS, VARIABLES, pad, type Measurement, type Participant, type Profile, type Range, type SupportRequest, type Variable } from '../lib/types'
 import { Modal, useToast } from './ui'
 
 const CACHE = 'antropnutri.participants'
@@ -141,28 +141,10 @@ export function MeasureForm({ campaignId, variables, ranges, profiles, groupCode
 
   const p = loaded?.participant
   const age = p ? (p.age ?? ageFrom(p.birth_date)) : null
-  const val = (v: Variable) => {
-    const m = done.get(v); if (m) return Number(m.value)
-    const x = Number((values[v] ?? '').replace(',', '.')); return x > 0 ? x : null
-  }
 
   return (
     <div className="card">
       {toast.node}
-      {variables.length > 1 && (
-        <div style={{ marginBottom: '1rem' }}>
-          <label>¿Qué medición está tomando?</label>
-          <div className="var-picker">
-            {variables.map((v) => {
-              const m = VARIABLES.find((x) => x.key === v)!
-              return <button type="button" key={v} className={current === v ? 'primary' : ''} aria-pressed={current === v}
-                onClick={() => choose(v)}>{m.label}<small>{m.unit}</small></button>
-            })}
-          </div>
-        </div>
-      )}
-      {currentMeta && <p className="measuring">Midiendo: <strong>{currentMeta.label}</strong> ({currentMeta.unit})</p>}
-      {!current ? <p className="muted">Seleccione la medición para comenzar.</p> : <>
       <form onSubmit={lookup}>
         <label htmlFor="num">Número del participante</label>
         <div className="row">
@@ -176,8 +158,7 @@ export function MeasureForm({ campaignId, variables, ranges, profiles, groupCode
 
       {loaded && !p && !loaded.offline && (
         <div className="alert warn" style={{ marginTop: '.8rem' }}>
-          El participante {pad(parseInt(numberText, 10))} no está registrado o pertenece a otro grupo sin apoyo autorizado.
-          {onRequestSupport && <> <button className="link" onClick={() => onRequestSupport(parseInt(numberText, 10))}>Solicitar apoyo</button></>}
+          El participante {pad(parseInt(numberText, 10))} no está registrado. Regístrelo primero con «+ Registrar participante».
         </div>
       )}
 
@@ -191,15 +172,30 @@ export function MeasureForm({ campaignId, variables, ranges, profiles, groupCode
               <span className="num">{pad(p.number)}</span>
               <div>
                 <strong style={{ fontSize: '1.1rem' }}>{p.full_name}</strong><br />
-                <span className="muted">{p.sex === 'F' ? 'Femenino' : 'Masculino'} · {age ?? '—'} años · Grupo {groupCode(p.group_id)}</span>
+                <span className="muted">{p.dni ? `DNI ${p.dni} · ` : ''}{age ?? '—'} años · {groupCode(p.group_id)}</span>
               </div>
             </div>
           )}
           {!loaded.offline && (
-            <p className="muted" style={{ fontSize: '.85rem' }}>
-              Avance del participante: {done.size}/5{done.size > 0 && ' · ' + VARIABLES.filter((v) => done.has(v.key)).map((v) => `${v.short} ${Number(done.get(v.key)!.value)}`).join(' · ')}
-            </p>
+            <p className="muted" style={{ fontSize: '.9rem', margin: '0 0 .6rem' }}>Avance: <strong>{done.size} de {N_VARS}</strong> mediciones registradas</p>
           )}
+          {variables.length > 1 && (
+        <div style={{ marginBottom: '1rem' }}>
+          <label>¿Qué medición va a registrar?</label>
+          <div className="var-picker">
+            {variables.map((v) => {
+              const m = VARIABLES.find((x) => x.key === v)!
+              const d = loaded && !loaded.offline ? done.get(v) : undefined
+              return <button type="button" key={v} className={`${current === v ? 'primary' : ''} ${d ? 'is-done' : ''}`} aria-pressed={current === v}
+                onClick={() => choose(v)}>
+                {d && <span className="tick" aria-label="registrado">✓</span>}
+                {m.label}<small>{d ? `${Number(d.value)} ${m.unit}` : m.unit}</small></button>
+            })}
+          </div>
+        </div>
+      )}
+          {!current ? <p className="muted">Toque la medición que va a registrar.</p> : <>
+          <p className="measuring">Registrando: <strong>{currentMeta!.label}</strong> ({currentMeta!.unit})</p>
           {pendingVars.length === 0 ? (
             <div className="alert ok">
               {currentMeta!.label} ya está registrado para este participante{prev ? `: ${Number(prev.value)} ${currentMeta!.unit}` : ''}{prevWho ? ` (${prevWho})` : ''}.
@@ -213,26 +209,23 @@ export function MeasureForm({ campaignId, variables, ranges, profiles, groupCode
             </div>
           ) : pendingVars.map((v, i) => {
             const meta = VARIABLES.find((x) => x.key === v)!
-            const r = ranges.find((x) => x.variable === v)
             return (
               <div className="field" key={v}>
                 {redo && prev && <div className="alert warn">Re-medición autorizada. El valor anterior ({Number(prev.value)} {meta.unit}{prevWho ? `, ${prevWho}` : ''}) será reemplazado y quedará en el historial.</div>}
                 <label htmlFor="valor">{redo ? 'Nuevo valor · ' : ''}{meta.label} ({meta.unit})</label>
                 <input id="valor" ref={i === 0 ? firstValRef : undefined} className="huge" inputMode="decimal" autoComplete="off"
                   value={values[v] ?? ''} onChange={(e) => setValues({ ...values, [v]: e.target.value.replace(/[^\d.,]/g, '') })}
-                  placeholder={r ? `${r.warn_min}–${r.warn_max}` : ''} />
-                <small>Valor final validado según el protocolo de medición.</small>
+                  placeholder={meta.unit} />
               </div>
             )
           })}
-          {p && <Indicators peso={val('peso')} talla={val('talla')} cintura={val('cintura')} pb={val('perimetro_braquial')} pct={val('pliegue_tricipital')} />}
+          </>}
           <div className="row" style={{ marginTop: '.6rem' }}>
             {pendingVars.length > 0 && <button className="primary big grow" disabled={busy}>{busy ? 'Guardando…' : 'Guardar y siguiente'}</button>}
             <button type="button" className="big" style={{ width: 'auto' }} onClick={reset}>{pendingVars.length ? 'Cancelar' : 'Siguiente'}</button>
           </div>
         </form>
       )}
-      </>}
 
       {confirm && (
         <Modal title="Confirmar valor inusual" onClose={() => setConfirm(null)}>
@@ -249,14 +242,6 @@ export function MeasureForm({ campaignId, variables, ranges, profiles, groupCode
       )}
     </div>
   )
-}
-
-function Indicators({ peso, talla, cintura, pb, pct }: Record<'peso' | 'talla' | 'cintura' | 'pb' | 'pct', number | null>) {
-  const items = [
-    ['IMC', imc(peso, talla), 'kg/m²'], ['Cintura/talla', rct(cintura, talla), ''], ['CMB estimada', cmb(pb, pct), 'cm'],
-  ].filter(([, v]) => v != null)
-  if (!items.length) return null
-  return <p className="muted" style={{ fontSize: '.9rem' }}>{items.map(([k, v, u]) => `${k}: ${v} ${u}`).join(' · ')}</p>
 }
 
 export function cacheParticipants(list: Participant[]) {

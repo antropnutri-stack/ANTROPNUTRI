@@ -2,10 +2,8 @@ import { useState, type FormEvent } from 'react'
 import { supabase, errorMessage } from '../lib/supabase'
 import { pad, type Group } from '../lib/types'
 
-export function RegisterParticipant({ groups, defaultGroupId, chooseGroup, onDone }: {
-  groups: Group[]; defaultGroupId: string | null; chooseGroup: boolean; onDone?: (n: number) => void
-}) {
-  const empty = { full_name: '', sex: '', birth_date: '', age: '', group_id: defaultGroupId ?? groups[0]?.id ?? '' }
+export function RegisterParticipant({ groups, onDone }: { groups: Group[]; onDone?: (n: number) => void }) {
+  const empty = { full_name: '', dni: '', age: '', group_id: '', sex: '' }
   const [f, setF] = useState(empty)
   const [msg, setMsg] = useState<{ kind: string; text: string } | null>(null)
   const [dup, setDup] = useState<string | null>(null)
@@ -13,11 +11,12 @@ export function RegisterParticipant({ groups, defaultGroupId, chooseGroup, onDon
 
   async function submit(e: FormEvent | null, force = false) {
     e?.preventDefault(); setMsg(null)
-    if (!f.birth_date && !f.age) return setMsg({ kind: 'err', text: 'Indique la fecha de nacimiento o la edad.' })
+    if (!f.group_id) return setMsg({ kind: 'err', text: 'Seleccione la promoción.' })
+    if (f.dni && !/^\d{8}$/.test(f.dni)) return setMsg({ kind: 'err', text: 'El DNI debe tener 8 dígitos.' })
     setBusy(true)
     const { data, error } = await supabase.rpc('register_participant', {
-      p_full_name: f.full_name, p_sex: f.sex, p_birth_date: f.birth_date || null,
-      p_age: f.age ? parseInt(f.age, 10) : null, p_group_id: chooseGroup ? f.group_id : null, p_force: force,
+      p_full_name: f.full_name, p_dni: f.dni || null, p_age: f.age ? parseInt(f.age, 10) : null,
+      p_group_id: f.group_id, p_sex: f.sex || null, p_force: force,
     })
     setBusy(false)
     if (error) return setMsg({ kind: 'err', text: errorMessage(error) })
@@ -26,7 +25,7 @@ export function RegisterParticipant({ groups, defaultGroupId, chooseGroup, onDon
       return
     }
     setDup(null)
-    setMsg({ kind: 'ok', text: `Registrado con el número ${pad(data.number)}. Entregue la tarjeta numerada.` })
+    setMsg({ kind: 'ok', text: `Registrado con el número ${pad(data.number)}.` })
     setF({ ...empty, group_id: f.group_id })
     onDone?.(data.number)
   }
@@ -45,19 +44,23 @@ export function RegisterParticipant({ groups, defaultGroupId, chooseGroup, onDon
       <div className="field"><label>Nombres y apellidos</label>
         <input value={f.full_name} onChange={(e) => setF({ ...f, full_name: e.target.value })} required minLength={3} /></div>
       <div className="grid cols-2" style={{ gap: '.6rem' }}>
-        <div className="field"><label>Sexo (referencias antropométricas)</label>
-          <select value={f.sex} onChange={(e) => setF({ ...f, sex: e.target.value })} required>
-            <option value="">—</option><option value="F">Femenino</option><option value="M">Masculino</option>
-          </select></div>
-        <div className="field"><label>Fecha de nacimiento</label>
-          <input type="date" value={f.birth_date} onChange={(e) => setF({ ...f, birth_date: e.target.value })} /></div>
-        <div className="field"><label>Edad (si no hay fecha)</label>
-          <input inputMode="numeric" value={f.age} disabled={!!f.birth_date} onChange={(e) => setF({ ...f, age: e.target.value.replace(/\D/g, '') })} /></div>
-        {chooseGroup && <div className="field"><label>Grupo</label>
-          <select value={f.group_id} onChange={(e) => setF({ ...f, group_id: e.target.value })}>
-            {groups.map((g) => <option key={g.id} value={g.id}>Grupo {g.code} ({pad(g.range_start)}–{pad(g.range_end)})</option>)}
-          </select></div>}
+        <div className="field"><label>DNI</label>
+          <input inputMode="numeric" maxLength={8} value={f.dni} onChange={(e) => setF({ ...f, dni: e.target.value.replace(/\D/g, '') })} placeholder="8 dígitos" /></div>
+        <div className="field"><label>Edad (años)</label>
+          <input inputMode="numeric" maxLength={3} value={f.age} onChange={(e) => setF({ ...f, age: e.target.value.replace(/\D/g, '') })} required /></div>
       </div>
+      <div className="field"><label>Promoción</label>
+        <div className="var-picker">
+          {groups.map((g) => (
+            <button type="button" key={g.id} className={f.group_id === g.id ? 'primary' : ''} aria-pressed={f.group_id === g.id}
+              onClick={() => setF({ ...f, group_id: g.id })}>{g.code}</button>
+          ))}
+        </div>
+      </div>
+      <div className="field"><label>Sexo (opcional)</label>
+        <select value={f.sex} onChange={(e) => setF({ ...f, sex: e.target.value })}>
+          <option value="">—</option><option value="F">Femenino</option><option value="M">Masculino</option>
+        </select></div>
       <button className="primary big" disabled={busy}>{busy ? 'Registrando…' : 'Registrar y asignar número'}</button>
     </form>
   )

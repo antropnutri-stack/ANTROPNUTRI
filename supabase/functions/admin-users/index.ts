@@ -32,9 +32,9 @@ Deno.serve(async (req) => {
       if (role === 'admin' && !isPrincipal) return json({ error: 'Solo el administrador principal crea administradores' }, 403)
       if (role === 'evaluador' && !canEvaluators) return json({ error: 'Sin permiso para crear evaluadores' }, 403)
       if (!['admin', 'evaluador'].includes(role)) return json({ error: 'Rol inválido' }, 400)
-      const code = String(body.code ?? '').trim().toUpperCase()
-      if (!/^[A-Z0-9-]{3,20}$/.test(code)) return json({ error: 'Código inválido (use letras, números y guiones)' }, 400)
-      if (String(body.password ?? '').length < 8) return json({ error: 'La contraseña debe tener al menos 8 caracteres' }, 400)
+      const code = String(body.code ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toUpperCase()
+      if (!/^[A-Z0-9-]{2,20}$/.test(code)) return json({ error: 'Usuario inválido (use letras, números y guiones, sin espacios)' }, 400)
+      if (String(body.password ?? '').length < 3) return json({ error: 'La contraseña debe tener al menos 3 caracteres' }, 400)
 
       const { data: created, error } = await admin.auth.admin.createUser({
         email: `${code.toLowerCase()}@${LOGIN_DOMAIN}`, password: body.password, email_confirm: true,
@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
       if (!target) return json({ error: 'No encontrado' }, 404)
       if (target.role !== 'evaluador' && !isPrincipal) return json({ error: 'No autorizado' }, 403)
       if (target.role === 'evaluador' && !canEvaluators) return json({ error: 'No autorizado' }, 403)
-      if (String(body.password ?? '').length < 8) return json({ error: 'La contraseña debe tener al menos 8 caracteres' }, 400)
+      if (String(body.password ?? '').length < 3) return json({ error: 'La contraseña debe tener al menos 3 caracteres' }, 400)
       const { error } = await admin.auth.admin.updateUserById(body.id, { password: body.password })
       if (error) return json({ error: error.message }, 400)
       await admin.from('audit_log').insert({ actor_id: caller.id, action: 'contraseña_restablecida', entity: 'profile', entity_id: body.id, details: {} })

@@ -52,7 +52,7 @@ export default function Requests() {
             <strong className="grow" style={{ fontSize: '1.1rem' }}>Participante {num(r.participant_id) ? pad(num(r.participant_id)!) : '—'} · {REQUEST_TYPE_LABEL[r.type]}</strong>
             <StatusBadge estado={r.status} />
           </div>
-          <p style={{ margin: '.4rem 0' }}>{r.type === 'remedicion' && r.origin_group_id === r.target_group_id ? `Grupo ${grp(r.origin_group_id)} (mismo grupo)` : `Grupo ${grp(r.origin_group_id)} → Grupo ${grp(r.target_group_id)}`}
+          <p style={{ margin: '.4rem 0' }}>{r.type === 'remedicion' && r.origin_group_id === r.target_group_id ? `${grp(r.origin_group_id)}` : `${grp(r.origin_group_id)} → ${grp(r.target_group_id)}`}
             {r.variables.length > 0 && <> · {r.variables.map((v) => {
               const m = r.type === 'remedicion' ? data.measurements.find((x) => x.participant_id === r.participant_id && x.variable === v) : undefined
               return varLabel(v) + (m ? ` (valor actual: ${Number(m.value)})` : '')

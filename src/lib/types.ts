@@ -1,7 +1,8 @@
 export type Role = 'principal' | 'admin' | 'evaluador'
 export type AccountStatus = 'activa' | 'suspendida' | 'desactivada'
 export type Station = 'registro' | 'peso' | 'talla' | 'cintura' | 'brazo' | 'supervision'
-export type Variable = 'peso' | 'talla' | 'cintura' | 'perimetro_braquial' | 'pliegue_tricipital'
+export type Variable = 'peso' | 'talla' | 'cintura' | 'perimetro_braquial' | 'cadera'
+  | 'pliegue_tricipital' | 'pliegue_subescapular' | 'pliegue_suprailiaco' | 'pliegue_bicipital'
 export type RequestType = 'apoyo_temporal' | 'apoyo_varias' | 'traslado' | 'remedicion'
 export type RequestStatus = 'pendiente' | 'aprobada' | 'rechazada' | 'cancelada' | 'finalizada'
 export type EvalStatus = 'sin_iniciar' | 'en_proceso' | 'completo' | 'requiere_revision'
@@ -33,8 +34,8 @@ export interface Group { id: string; campaign_id: string; code: string; range_st
 export interface Campaign { id: string; name: string; event_date: string; is_active: boolean }
 
 export interface Participant {
-  id: string; campaign_id: string; number: number; full_name: string; birth_date: string | null; age: number | null
-  sex: 'M' | 'F'; group_id: string; needs_review: boolean; review_note: string | null; created_by: string | null
+  id: string; campaign_id: string; number: number; full_name: string; dni: string | null; birth_date: string | null; age: number | null
+  sex: 'M' | 'F' | null; group_id: string; needs_review: boolean; review_note: string | null; created_by: string | null
 }
 
 export interface Measurement {
@@ -47,11 +48,12 @@ export interface Range {
 }
 
 export interface ParticipantResult {
-  id: string; campaign_id: string; number: number; full_name: string; sex: 'M' | 'F'; birth_date: string | null; age: number | null
+  id: string; campaign_id: string; number: number; full_name: string; dni: string | null; sex: 'M' | 'F' | null; birth_date: string | null; age: number | null
   group_id: string; group_code: string; needs_review: boolean; review_note: string | null; event_date: string
-  peso: number | null; talla: number | null; cintura: number | null; perimetro_braquial: number | null; pliegue_tricipital: number | null
+  peso: number | null; talla: number | null; cintura: number | null; perimetro_braquial: number | null; cadera: number | null
+  pliegue_tricipital: number | null; pliegue_subescapular: number | null; pliegue_suprailiaco: number | null; pliegue_bicipital: number | null
   n_measurements: number; any_unusual: boolean; imc: number | null; imc_clasificacion: string | null
-  rct: number | null; cmb: number | null; estado: EvalStatus
+  rct: number | null; icc: number | null; cmb: number | null; suma_pliegues: number | null; estado: EvalStatus
 }
 
 export interface SupportRequest {
@@ -66,9 +68,14 @@ export const VARIABLES: { key: Variable; label: string; short: string; unit: str
   { key: 'peso', label: 'Peso corporal', short: 'Peso', unit: 'kg' },
   { key: 'talla', label: 'Talla', short: 'Talla', unit: 'cm' },
   { key: 'cintura', label: 'Perímetro de cintura', short: 'Cintura', unit: 'cm' },
-  { key: 'perimetro_braquial', label: 'Perímetro braquial medio', short: 'Brazo', unit: 'cm' },
-  { key: 'pliegue_tricipital', label: 'Pliegue cutáneo tricipital', short: 'Pliegue', unit: 'mm' },
+  { key: 'perimetro_braquial', label: 'Perímetro de bíceps', short: 'Bíceps', unit: 'cm' },
+  { key: 'cadera', label: 'Perímetro de cadera', short: 'Cadera', unit: 'cm' },
+  { key: 'pliegue_tricipital', label: 'Pliegue tricipital', short: 'P. tricip.', unit: 'mm' },
+  { key: 'pliegue_subescapular', label: 'Pliegue subescapular', short: 'P. subesc.', unit: 'mm' },
+  { key: 'pliegue_suprailiaco', label: 'Pliegue suprailíaco', short: 'P. supra.', unit: 'mm' },
+  { key: 'pliegue_bicipital', label: 'Pliegue bicipital', short: 'P. bicip.', unit: 'mm' },
 ]
+export const N_VARS = VARIABLES.length
 export const varLabel = (v: Variable) => VARIABLES.find((x) => x.key === v)!.label
 
 export const STATIONS: { key: Station; label: string; variables: Variable[] }[] = [

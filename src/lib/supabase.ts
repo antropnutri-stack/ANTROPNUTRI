@@ -9,7 +9,8 @@ export const supabase = createClient(url ?? 'http://localhost', key ?? 'missing'
 })
 
 export const LOGIN_DOMAIN = (import.meta.env.VITE_LOGIN_DOMAIN as string | undefined) ?? 'antropnutri.local'
-export const codeToEmail = (code: string) => `${code.trim().toLowerCase()}@${LOGIN_DOMAIN}`
+export const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase()
+export const codeToEmail = (code: string) => `${normalize(code).replace(/\s+/g, '')}@${LOGIN_DOMAIN}`
 
 /** Convierte errores de las funciones SQL («CODIGO: detalle») en mensajes legibles. */
 export function errorMessage(e: unknown): string {

@@ -20,7 +20,7 @@ export default function Participants() {
 
   const rows = useMemo(() => (data?.results ?? []).filter((r) =>
     (!group || r.group_id === group) && (!estado || r.estado === estado) &&
-    (!q || pad(r.number).includes(q) || normName(r.full_name).includes(normName(q)))), [data, q, group, estado])
+    (!q || pad(r.number).includes(q) || (r.dni ?? '').includes(q) || normName(r.full_name).includes(normName(q)))), [data, q, group, estado])
 
   if (!cfg || !data) return <p className="muted">Cargando…</p>
   const sel = data.results.find((r) => r.id === open)
@@ -30,9 +30,9 @@ export default function Participants() {
       <div className="row"><h1 className="grow">Participantes</h1>
         {can('can_manage_participants') && <button className="primary" onClick={() => setAdding(true)}>+ Registro manual</button>}</div>
       <div className="card row">
-        <input className="grow" placeholder="Buscar por número o nombre" value={q} onChange={(e) => setQ(e.target.value)} style={{ minWidth: 200 }} />
+        <input className="grow" placeholder="Buscar por número, DNI o nombre" value={q} onChange={(e) => setQ(e.target.value)} style={{ minWidth: 200 }} />
         <select style={{ width: 'auto' }} value={group} onChange={(e) => setGroup(e.target.value)}>
-          <option value="">Todos los grupos</option>{cfg.groups.map((g) => <option key={g.id} value={g.id}>Grupo {g.code}</option>)}
+          <option value="">Todas las promociones</option>{cfg.groups.map((g) => <option key={g.id} value={g.id}>{g.code}</option>)}
         </select>
         <select style={{ width: 'auto' }} value={estado} onChange={(e) => setEstado(e.target.value as EvalStatus)}>
           <option value="">Todos los estados</option>{Object.entries(STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -41,21 +41,21 @@ export default function Participants() {
       </div>
       <div className="card table-wrap" style={{ maxHeight: '70vh', padding: 0 }}>
         <table>
-          <thead><tr><th>N.º</th><th>Grupo</th><th>Nombre</th><th>Sexo</th><th className="num">Edad</th>
+          <thead><tr><th>N.º</th><th>Promoción</th><th>Nombre</th><th>DNI</th><th className="num">Edad</th>
             {VARIABLES.map((v) => <th key={v.key} className="num">{v.short}</th>)}
-            <th className="num">IMC</th><th className="num">RCT</th><th className="num">CMB</th><th>Estado</th></tr></thead>
+            <th className="num">IMC</th><th className="num">RCT</th><th className="num">ICC</th><th className="num">CMB</th><th className="num">Σ pliegues</th><th>Estado</th></tr></thead>
           <tbody>{rows.map((r) => (
             <tr key={r.id} className="clickable" onClick={() => setOpen(r.id)}>
-              <td><strong>{pad(r.number)}</strong></td><td>{r.group_code}</td><td>{r.full_name}</td><td>{r.sex}</td><td className="num">{r.age ?? ''}</td>
+              <td><strong>{pad(r.number)}</strong></td><td>{r.group_code}</td><td>{r.full_name}</td><td>{r.dni ?? ''}</td><td className="num">{r.age ?? ''}</td>
               {VARIABLES.map((v) => <td key={v.key} className="num">{r[v.key] ?? '·'}</td>)}
-              <td className="num" title={r.imc_clasificacion ?? ''}>{r.imc ?? ''}</td><td className="num">{r.rct ?? ''}</td><td className="num">{r.cmb ?? ''}</td>
+              <td className="num" title={r.imc_clasificacion ?? ''}>{r.imc ?? ''}</td><td className="num">{r.rct ?? ''}</td><td className="num">{r.icc ?? ''}</td><td className="num">{r.cmb ?? ''}</td><td className="num">{r.suma_pliegues ?? ''}</td>
               <td><StatusBadge estado={r.estado} />{r.any_unusual && <span className="badge warn" title="Valor inusual confirmado"> !</span>}</td>
             </tr>))}</tbody>
         </table>
       </div>
       {sel && <ParticipantDetail r={sel} cfg={cfg} measurements={data.measurements.filter((m) => m.participant_id === sel.id)} onClose={() => setOpen(null)} onChange={refresh} />}
       {adding && <Modal title="Registro manual" onClose={() => setAdding(false)}>
-        <RegisterParticipant groups={cfg.groups} defaultGroupId={null} chooseGroup onDone={() => void refresh()} />
+        <RegisterParticipant groups={cfg.groups} onDone={() => void refresh()} />
       </Modal>}
     </>
   )
@@ -67,7 +67,7 @@ function ParticipantDetail({ r, cfg, measurements, onClose, onChange }: {
   const { can } = useAuth()
   const toast = useToast()
   const [edit, setEdit] = useState(false)
-  const [f, setF] = useState({ full_name: r.full_name, sex: r.sex, birth_date: r.birth_date ?? '', age: r.birth_date ? '' : String(r.age ?? '') })
+  const [f, setF] = useState({ full_name: r.full_name, dni: r.dni ?? '', sex: r.sex ?? '', age: String(r.age ?? '') })
   const who = (id: string) => cfg.profiles.find((p) => p.id === id)?.display_name ?? '—'
 
   async function run(fn: string, args: Record<string, unknown>, ok: string) {
@@ -80,18 +80,18 @@ function ParticipantDetail({ r, cfg, measurements, onClose, onChange }: {
     <Modal title={`Participante ${pad(r.number)}`} onClose={onClose}>
       {toast.node}
       {!edit ? (
-        <p><strong>{r.full_name}</strong><br /><span className="muted">{r.sex === 'F' ? 'Femenino' : 'Masculino'} · {r.age ?? '—'} años{r.birth_date ? ` (${r.birth_date})` : ''} · Grupo {r.group_code}</span><br />
+        <p><strong>{r.full_name}</strong><br /><span className="muted">{r.dni ? `DNI ${r.dni} · ` : ''}{r.age ?? '—'} años · {r.group_code}{r.sex ? ` · ${r.sex === 'F' ? 'Femenino' : 'Masculino'}` : ''}</span><br />
           <StatusBadge estado={r.estado} /> {r.review_note && <small className="muted">Revisión: {r.review_note}</small>}</p>
       ) : (
         <div>
           <div className="field"><label>Nombres y apellidos</label><input value={f.full_name} onChange={(e) => setF({ ...f, full_name: e.target.value })} /></div>
           <div className="row">
-            <div className="field grow"><label>Sexo</label><select value={f.sex} onChange={(e) => setF({ ...f, sex: e.target.value as 'M' })}><option value="F">Femenino</option><option value="M">Masculino</option></select></div>
-            <div className="field grow"><label>Nacimiento</label><input type="date" value={f.birth_date} onChange={(e) => setF({ ...f, birth_date: e.target.value })} /></div>
-            <div className="field grow"><label>Edad</label><input value={f.age} disabled={!!f.birth_date} onChange={(e) => setF({ ...f, age: e.target.value.replace(/\D/g, '') })} /></div>
+            <div className="field grow"><label>DNI</label><input inputMode="numeric" maxLength={8} value={f.dni} onChange={(e) => setF({ ...f, dni: e.target.value.replace(/\D/g, '') })} /></div>
+            <div className="field grow"><label>Edad</label><input value={f.age} onChange={(e) => setF({ ...f, age: e.target.value.replace(/\D/g, '') })} /></div>
+            <div className="field grow"><label>Sexo</label><select value={f.sex} onChange={(e) => setF({ ...f, sex: e.target.value })}><option value="">—</option><option value="F">Femenino</option><option value="M">Masculino</option></select></div>
           </div>
           <div className="row" style={{ marginBottom: '1rem' }}>
-            <button className="primary" onClick={() => { const reason = ask('Motivo de la corrección:'); if (reason) void run('update_participant', { p_id: r.id, p_full_name: f.full_name, p_sex: f.sex, p_birth_date: f.birth_date || null, p_age: f.age ? +f.age : null, p_reason: reason }, 'Datos corregidos').then(() => setEdit(false)) }}>Guardar</button>
+            <button className="primary" onClick={() => { const reason = ask('Motivo de la corrección:'); if (reason) void run('update_participant', { p_id: r.id, p_full_name: f.full_name, p_dni: f.dni || null, p_age: f.age ? +f.age : null, p_sex: f.sex || null, p_birth_date: null, p_reason: reason }, 'Datos corregidos').then(() => setEdit(false)) }}>Guardar</button>
             <button onClick={() => setEdit(false)}>Cancelar</button>
           </div>
         </div>
@@ -109,16 +109,16 @@ function ParticipantDetail({ r, cfg, measurements, onClose, onChange }: {
               </span>}</td></tr>
           )
         })}</tbody></table></div>
-      <p className="muted" style={{ marginTop: '.6rem' }}>IMC: {r.imc ?? '—'} {r.imc_clasificacion ? `(${r.imc_clasificacion})` : ''} · RCT: {r.rct ?? '—'} · CMB estimada: {r.cmb ?? '—'} cm</p>
+      <p className="muted" style={{ marginTop: '.6rem' }}>IMC: {r.imc ?? '—'} {r.imc_clasificacion ? `(${r.imc_clasificacion})` : ''} · RCT: {r.rct ?? '—'} · ICC: {r.icc ?? '—'} · CMB estimada: {r.cmb ?? '—'} cm · Σ 4 pliegues: {r.suma_pliegues ?? '—'} mm</p>
 
       <div className="row" style={{ marginTop: '1rem' }}>
         {can('can_manage_participants') && !edit && <button onClick={() => setEdit(true)}>Editar identificación</button>}
         <button onClick={() => { const note = r.needs_review ? null : ask('Motivo de la revisión:'); if (r.needs_review || note) void run('set_review', { p_id: r.id, p_needs_review: !r.needs_review, p_note: note }, 'Estado actualizado') }}>
           {r.needs_review ? 'Marcar revisión resuelta' : 'Marcar «requiere revisión»'}</button>
         {can('can_change_group') && (
-          <select style={{ width: 'auto' }} value="" onChange={(e) => { const g = e.target.value; const reason = g && ask('Motivo del cambio de grupo:'); if (g && reason) void run('change_participant_group', { p_id: r.id, p_group_id: g, p_reason: reason }, 'Grupo cambiado') }}>
-            <option value="">Cambiar grupo…</option>
-            {cfg.groups.filter((g) => g.id !== r.group_id).map((g) => <option key={g.id} value={g.id}>Grupo {g.code}</option>)}
+          <select style={{ width: 'auto' }} value="" onChange={(e) => { const g = e.target.value; const reason = g && ask('Motivo del cambio de promoción:'); if (g && reason) void run('change_participant_group', { p_id: r.id, p_group_id: g, p_reason: reason }, 'Promoción cambiada') }}>
+            <option value="">Cambiar promoción…</option>
+            {cfg.groups.filter((g) => g.id !== r.group_id).map((g) => <option key={g.id} value={g.id}>{g.code}</option>)}
           </select>
         )}
       </div>

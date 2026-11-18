@@ -24,6 +24,11 @@ export function cmb(pbCm?: number | null, pctMm?: number | null): number | null 
   return round(pbCm - Math.PI * (pctMm / 10), 1)
 }
 
+export function icc(cinturaCm?: number | null, caderaCm?: number | null): number | null {
+  if (!cinturaCm || !caderaCm) return null
+  return round(cinturaCm / caderaCm, 3)
+}
+
 export function ageFrom(birth: string | null | undefined, at: Date = new Date()): number | null {
   if (!birth) return null
   const b = new Date(birth + 'T00:00:00')

@@ -21,7 +21,7 @@ export default function Quality() {
       <div className="grid cols-2">
         <div className="card"><h2>Requieren revisión ({review.length})</h2>
           {review.length === 0 ? <p className="muted">Ninguno.</p> : <table><tbody>{review.map((r) => (
-            <tr key={r.id}><td><strong>{pad(r.number)}</strong></td><td>Grupo {r.group_code}</td><td>{r.review_note}</td></tr>))}</tbody></table>}
+            <tr key={r.id}><td><strong>{pad(r.number)}</strong></td><td>{r.group_code}</td><td>{r.review_note}</td></tr>))}</tbody></table>}
         </div>
         <div className="card"><h2>Indicadores incoherentes ({incoherent.length})</h2>
           <p className="muted" style={{ fontSize: '.85rem' }}>IMC &lt; 13 o &gt; 55, RCT &lt; 0.3 o &gt; 0.9, CMB ≤ 10 cm: suele indicar un error de unidad o de digitación.</p>

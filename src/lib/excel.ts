@@ -8,6 +8,7 @@ const loadExcel = async () => (await import('exceljs')).default
 export interface ImportRow {
   row: number
   full_name: string
+  dni: string
   sex: string
   birth_date: string
   age: string
@@ -18,12 +19,13 @@ export interface ImportRow {
   include: boolean
 }
 
-const HEADERS: Record<keyof Pick<ImportRow, 'full_name' | 'sex' | 'birth_date' | 'age' | 'group_code' | 'number'>, string[]> = {
+const HEADERS: Record<keyof Pick<ImportRow, 'full_name' | 'dni' | 'sex' | 'birth_date' | 'age' | 'group_code' | 'number'>, string[]> = {
+  dni: ['dni', 'documento', 'n° dni', 'nro dni', 'numero de dni'],
   full_name: ['nombres y apellidos', 'nombre completo', 'nombres', 'nombre', 'apellidos y nombres', 'participante'],
   sex: ['sexo', 'genero'],
   birth_date: ['fecha de nacimiento', 'fecha nacimiento', 'nacimiento', 'f. nacimiento', 'fnac'],
   age: ['edad'],
-  group_code: ['grupo'],
+  group_code: ['promocion', 'promoción', 'grupo'],
   number: ['numero', 'n°', 'nº', 'n.º', 'nro', 'codigo', 'n'],
 }
 
@@ -94,15 +96,16 @@ export async function parseParticipantsFile(file: File, existing: { full_name: s
     const full_name = get('full_name').replace(/\s+/g, ' ').trim()
     if (!full_name) continue
     const item: ImportRow = {
-      row: r, full_name, sex: parseSex(get('sex')), birth_date: parseDate(get('birth_date')),
+      row: r, full_name, dni: get('dni').replace(/\D/g, ''), sex: parseSex(get('sex')), birth_date: parseDate(get('birth_date')),
       age: get('age').replace(/\D/g, ''), group_code: get('group_code').toUpperCase(), number: get('number').replace(/\D/g, ''),
       issues: [], include: true,
     }
-    if (!item.sex) item.issues.push('Falta sexo')
+    if (item.dni && item.dni.length !== 8) item.issues.push('DNI debe tener 8 dígitos')
+    if (!item.group_code) item.issues.push('Falta promoción')
     if (item.sex.startsWith('invalido:')) item.issues.push(`Sexo no reconocido: «${item.sex.slice(9)}»`)
     if (item.birth_date.startsWith('invalida:')) item.issues.push(`Fecha no reconocida: «${item.birth_date.slice(9)}»`)
-    if (!item.birth_date && !item.age) item.issues.push('Falta fecha de nacimiento o edad')
-    if (item.group_code && !groupCodes.has(item.group_code)) item.issues.push(`Grupo «${item.group_code}» no existe`)
+    if (!item.birth_date && !item.age) item.issues.push('Falta edad')
+    if (item.group_code && !groupCodes.has(item.group_code)) item.issues.push(`Promoción «${item.group_code}» no existe`)
     if (item.number) {
       const n = Number(item.number)
       if (existingNumbers.has(n) || seenNumbers.has(n)) item.issues.push(`Número ${pad(n)} ya asignado`)
@@ -124,11 +127,10 @@ export async function downloadTemplate() {
   const wb = new ExcelJS.Workbook()
   const ws = wb.addWorksheet('Participantes')
   ws.columns = [
-    { header: 'Nombres y apellidos', width: 36 }, { header: 'Sexo', width: 8 },
-    { header: 'Fecha de nacimiento', width: 20 }, { header: 'Edad', width: 8 },
-    { header: 'Grupo', width: 8 }, { header: 'Número', width: 10 },
+    { header: 'Nombres y apellidos', width: 36 }, { header: 'DNI', width: 12 },
+    { header: 'Edad', width: 8 }, { header: 'Promoción', width: 16 }, { header: 'Sexo', width: 8 },
   ]
-  ws.addRow(['Apellido Apellido, Nombre', 'F', '2005-04-12', '', '', ''])
+  ws.addRow(['Apellido Apellido Nombre', '12345678', 20, 'JUSTICIEROS', ''])
   styleHeader(ws)
   await save(wb, 'plantilla_participantes.xlsx')
 }
@@ -176,15 +178,14 @@ export async function exportWorkbook(d: ExportData) {
   // 1. Resultados: una fila por participante
   const ws = wb.addWorksheet('Resultados')
   ws.columns = [
-    { header: 'N.º', key: 'n', width: 7 }, { header: 'Grupo', key: 'g', width: 7 },
-    { header: 'Nombres y apellidos', key: 'name', width: 34 }, { header: 'Sexo', key: 'sex', width: 6 },
-    { header: 'Fecha de nacimiento', key: 'bd', width: 13 }, { header: 'Edad', key: 'age', width: 6 },
+    { header: 'N.º', key: 'n', width: 7 }, { header: 'Promoción', key: 'g', width: 13 },
+    { header: 'Nombres y apellidos', key: 'name', width: 34 }, { header: 'DNI', key: 'dni', width: 11 },
+    { header: 'Edad', key: 'age', width: 6 }, { header: 'Sexo', key: 'sex', width: 6 },
     { header: 'Fecha de evaluación', key: 'ed', width: 13 },
-    { header: 'Peso (kg)', key: 'peso', width: 9 }, { header: 'Talla (cm)', key: 'talla', width: 9 },
-    { header: 'Cintura (cm)', key: 'cintura', width: 10 }, { header: 'Perímetro braquial (cm)', key: 'perimetro_braquial', width: 11 },
-    { header: 'Pliegue tricipital (mm)', key: 'pliegue_tricipital', width: 11 },
+    ...VARIABLES.map((v) => ({ header: `${v.label} (${v.unit})`, key: v.key, width: 11 })),
     { header: 'IMC (kg/m²)', key: 'imc', width: 9 }, { header: 'Clasificación IMC', key: 'imcc', width: 16 },
-    { header: 'Relación cintura/talla', key: 'rct', width: 10 }, { header: 'CMB estimada (cm)', key: 'cmb', width: 10 },
+    { header: 'Relación cintura/talla', key: 'rct', width: 10 }, { header: 'Índice cintura/cadera', key: 'icc', width: 10 },
+    { header: 'CMB estimada (cm)', key: 'cmb', width: 10 }, { header: 'Suma 4 pliegues (mm)', key: 'sp', width: 10 },
     { header: 'Mediciones', key: 'nm', width: 9 }, { header: 'Estado', key: 'st', width: 16 },
     { header: 'Valor inusual confirmado', key: 'un', width: 10 },
     ...VARIABLES.map((v) => ({ header: `Evaluador · ${v.short}`, key: 'ev_' + v.key, width: 16 })),
@@ -192,10 +193,9 @@ export async function exportWorkbook(d: ExportData) {
   for (const r of [...d.results].sort((a, b) => a.number - b.number)) {
     const ms = byP.get(r.id)
     ws.addRow({
-      n: pad(r.number), g: r.group_code, name: r.full_name, sex: r.sex, bd: r.birth_date ?? '', age: r.age,
-      ed: r.event_date, peso: num(r.peso), talla: num(r.talla), cintura: num(r.cintura),
-      perimetro_braquial: num(r.perimetro_braquial), pliegue_tricipital: num(r.pliegue_tricipital),
-      imc: num(r.imc), imcc: r.imc_clasificacion ?? '', rct: num(r.rct), cmb: num(r.cmb),
+      n: pad(r.number), g: r.group_code, name: r.full_name, dni: r.dni ?? '', sex: r.sex ?? '', age: r.age,
+      ed: r.event_date, ...Object.fromEntries(VARIABLES.map((v) => [v.key, num(r[v.key])])),
+      imc: num(r.imc), imcc: r.imc_clasificacion ?? '', rct: num(r.rct), icc: num(r.icc), cmb: num(r.cmb), sp: num(r.suma_pliegues),
       nm: r.n_measurements, st: STATUS_LABEL[r.estado], un: r.any_unusual ? 'Sí' : '',
       ...Object.fromEntries(VARIABLES.map((v) => ['ev_' + v.key, who(ms?.get(v.key)?.evaluator_id)])),
     })
@@ -205,7 +205,7 @@ export async function exportWorkbook(d: ExportData) {
 
   // 2. Pendientes
   const wp = wb.addWorksheet('Pendientes')
-  wp.columns = [{ header: 'N.º', width: 7 }, { header: 'Grupo', width: 7 }, { header: 'Nombres y apellidos', width: 34 },
+  wp.columns = [{ header: 'N.º', width: 7 }, { header: 'Promoción', width: 13 }, { header: 'Nombres y apellidos', width: 34 },
     { header: 'Estado', width: 16 }, { header: 'Mediciones faltantes', width: 60 }]
   for (const r of d.results.filter((x) => x.estado !== 'completo').sort((a, b) => a.number - b.number)) {
     const ms = byP.get(r.id)
@@ -254,8 +254,11 @@ export async function exportWorkbook(d: ExportData) {
   wsum.columns = [{ header: 'Indicador', width: 30 }, { header: 'n', width: 8 }, { header: 'Media', width: 10 },
     { header: 'DE', width: 10 }, { header: 'Mínimo', width: 10 }, { header: 'Máximo', width: 10 }]
   const cols: [string, keyof ParticipantResult][] = [['Peso (kg)', 'peso'], ['Talla (cm)', 'talla'], ['Cintura (cm)', 'cintura'],
-    ['Perímetro braquial (cm)', 'perimetro_braquial'], ['Pliegue tricipital (mm)', 'pliegue_tricipital'],
-    ['IMC (kg/m²)', 'imc'], ['Relación cintura/talla', 'rct'], ['CMB estimada (cm)', 'cmb']]
+    ['Perímetro de bíceps (cm)', 'perimetro_braquial'], ['Perímetro de cadera (cm)', 'cadera'],
+    ['Pliegue tricipital (mm)', 'pliegue_tricipital'], ['Pliegue subescapular (mm)', 'pliegue_subescapular'],
+    ['Pliegue suprailíaco (mm)', 'pliegue_suprailiaco'], ['Pliegue bicipital (mm)', 'pliegue_bicipital'],
+    ['IMC (kg/m²)', 'imc'], ['Relación cintura/talla', 'rct'], ['Índice cintura/cadera', 'icc'],
+    ['CMB estimada (cm)', 'cmb'], ['Suma 4 pliegues (mm)', 'suma_pliegues']]
   for (const [label, k] of cols) {
     const xs = d.results.map((r) => r[k]).filter((x): x is number => x != null).map(Number)
     const n = xs.length, mean = n ? xs.reduce((a, b) => a + b, 0) / n : 0

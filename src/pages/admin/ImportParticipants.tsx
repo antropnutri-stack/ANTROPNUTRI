@@ -24,7 +24,7 @@ export default function ImportParticipants() {
     const sel = rows!.filter((r) => r.include)
     if (!sel.length) return
     setBusy(true)
-    const payload = sel.map((r) => ({ full_name: r.full_name, sex: r.sex, birth_date: r.birth_date, age: r.age, group_code: r.group_code, number: r.number }))
+    const payload = sel.map((r) => ({ full_name: r.full_name, dni: r.dni, sex: r.sex.startsWith('invalido') ? '' : r.sex, birth_date: r.birth_date, age: r.age, group_code: r.group_code, number: r.number }))
     const { data, error } = await supabase.rpc('import_participants', { p_rows: payload })
     setBusy(false)
     if (error) return setMsg({ kind: 'err', text: errorMessage(error) })
@@ -38,7 +38,7 @@ export default function ImportParticipants() {
     <>
       <h1>Importar participantes desde Excel</h1>
       <div className="card">
-        <p>Columnas reconocidas: <strong>Nombres y apellidos</strong> (obligatoria), Sexo (F/M), Fecha de nacimiento (aaaa-mm-dd o dd/mm/aaaa), Edad, Grupo (A–E) y Número. Si no indica grupo ni número, se asignan automáticamente según los rangos de cada grupo.</p>
+        <p>Columnas: <strong>Nombres y apellidos</strong>, <strong>DNI</strong>, <strong>Edad</strong> y <strong>Promoción</strong> (JUSTICIEROS o AGUERRIDOS). Opcional: Sexo (F/M) y Número. Si no indica número, se asigna el siguiente libre.</p>
         <div className="row">
           <input type="file" accept=".xlsx" style={{ width: 'auto' }} onChange={(e) => e.target.files?.[0] && void onFile(e.target.files[0])} />
           <button onClick={() => void downloadTemplate()}>Descargar plantilla</button>
@@ -54,12 +54,12 @@ export default function ImportParticipants() {
             <button className="primary" disabled={!included || busy} onClick={() => void confirmImport()}>Confirmar importación</button>
             <button onClick={() => setRows(null)}>Cancelar</button></div>
           <div className="table-wrap" style={{ maxHeight: '60vh' }}><table>
-            <thead><tr><th /><th>Fila</th><th>Nombre</th><th>Sexo</th><th>Nacimiento</th><th>Edad</th><th>Grupo</th><th>N.º</th><th>Observaciones</th></tr></thead>
+            <thead><tr><th /><th>Fila</th><th>Nombre</th><th>DNI</th><th>Edad</th><th>Promoción</th><th>N.º</th><th>Observaciones</th></tr></thead>
             <tbody>{rows.map((r, i) => (
               <tr key={r.row} style={{ background: r.issues.length ? 'var(--err-bg)' : r.duplicateOf ? 'var(--warn-bg)' : undefined }}>
                 <td><input type="checkbox" checked={r.include} disabled={r.issues.length > 0}
                   onChange={(e) => setRows(rows.map((x, j) => j === i ? { ...x, include: e.target.checked } : x))} /></td>
-                <td>{r.row}</td><td>{r.full_name}</td><td>{r.sex}</td><td>{r.birth_date}</td><td>{r.age}</td><td>{r.group_code || 'auto'}</td><td>{r.number || 'auto'}</td>
+                <td>{r.row}</td><td>{r.full_name}</td><td>{r.dni}</td><td>{r.age}</td><td>{r.group_code}</td><td>{r.number || 'auto'}</td>
                 <td>{[...r.issues, r.duplicateOf ? `Posible duplicado: ${r.duplicateOf}` : ''].filter(Boolean).join(' · ')}</td>
               </tr>))}</tbody>
           </table></div>

@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import { supabase, codeToEmail } from './supabase'
+import { supabase, codeToEmail, normalize } from './supabase'
 import type { PermKey, Profile } from './types'
 import { initQueue } from './offlineQueue'
 
@@ -37,7 +37,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [loadProfile])
 
   const signIn = async (code: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email: codeToEmail(code), password })
+    const email = codeToEmail(code)
+    let { error } = await supabase.auth.signInWithPassword({ email, password })
+    // Contraseñas tipo apellido: se aceptan en mayúsculas/minúsculas y con o sin tildes
+    if (error && normalize(password) !== password) {
+      ({ error } = await supabase.auth.signInWithPassword({ email, password: normalize(password) }))
+    }
     if (error) throw error
   }
   const signOut = async () => { await supabase.auth.signOut() }

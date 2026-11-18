@@ -8,7 +8,7 @@ export function SupportRequestForm({ groups, ownGroupId, initialNumber, initialT
   onClose: () => void; onDone: () => void
 }) {
   const [number, setNumber] = useState(initialNumber ? String(initialNumber) : '')
-  const [type, setTypeRaw] = useState<RequestType>(initialType ?? 'apoyo_temporal')
+  const [type, setTypeRaw] = useState<RequestType>(initialType ?? 'remedicion')
   const otherGroup = groups.find((g) => g.id !== ownGroupId)?.id ?? ''
   const [target, setTarget] = useState(initialType === 'remedicion' ? (ownGroupId ?? '') : otherGroup)
   const [vars, setVars] = useState<Variable[]>(initialVariable ? [initialVariable] : [])
@@ -29,7 +29,7 @@ export function SupportRequestForm({ groups, ownGroupId, initialNumber, initialT
     setBusy(true)
     const { error } = await supabase.rpc('create_support_request', {
       p_participant_number: parseInt(number, 10), p_type: type, p_reason: reason,
-      p_target_group_id: target, p_variables: type === 'traslado' ? [] : vars,
+      p_target_group_id: type === 'remedicion' ? null : target, p_variables: type === 'traslado' ? [] : vars,
     })
     setBusy(false)
     if (error) return setError(errorMessage(error))
@@ -47,19 +47,19 @@ export function SupportRequestForm({ groups, ownGroupId, initialNumber, initialT
         <div className="field">
           <label>Tipo de solicitud</label>
           <select value={type} onChange={(e) => setType(e.target.value as RequestType)}>
-            {Object.entries(REQUEST_TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            {Object.entries(REQUEST_TYPE_LABEL).filter(([k]) => k === 'remedicion').map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
           <small>{type === 'traslado' ? 'Cambia el grupo asignado; el número se conserva.'
             : type === 'remedicion' ? 'Para repetir una medición ya registrada. Al aprobarse, el nuevo valor reemplaza al anterior (que queda en el historial).'
             : 'El participante conserva su grupo; otro grupo realiza solo las mediciones autorizadas.'}</small>
         </div>
-        <div className="field">
-          <label>{type === 'remedicion' ? '¿Quién vuelve a medir?' : 'Grupo de destino'}</label>
+        {type !== 'remedicion' && <div className="field">
+          <label>Grupo de destino</label>
           <select value={target} onChange={(e) => setTarget(e.target.value)} required>
-            {groups.filter((g) => type === 'remedicion' || g.id !== ownGroupId).map((g) => (
-              <option key={g.id} value={g.id}>Grupo {g.code}{g.id === ownGroupId ? ' (mi grupo)' : ''}</option>))}
+            {groups.filter((g) => g.id !== ownGroupId).map((g) => (
+              <option key={g.id} value={g.id}>{g.code}{g.id === ownGroupId ? ' (mi grupo)' : ''}</option>))}
           </select>
-        </div>
+        </div>}
         {type !== 'traslado' && (
           <div className="field">
             <label>{type === 'remedicion' ? 'Mediciones a repetir' : 'Mediciones a autorizar'}</label>

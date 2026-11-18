@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useConfig } from '../../lib/hooks'
-import { STATIONS, VARIABLES, pad } from '../../lib/types'
+import { N_VARS, VARIABLES } from '../../lib/types'
 import { Bar, Stat } from '../../components/ui'
 import { useOperations } from './data'
 
@@ -35,23 +35,23 @@ export default function Dashboard() {
         <Stat label="Completos" value={complete} />
         <Stat label="Requieren revisión" value={review} />
         <Stat label="Evaluadores activos" value={evaluators.length} />
-        <Stat label="Grupos" value={cfg.groups.length} />
+        <Stat label="Promociones" value={cfg.groups.length} />
         <Stat label="Autorizadores" value={authorizers.length} />
       </div>
       {pendingReq > 0 && <div className="alert warn"><strong>{pendingReq} solicitud(es) de apoyo pendiente(s).</strong> <Link to="/solicitudes">Revisar</Link></div>}
 
       <div className="grid cols-2">
         <div className="card">
-          <h2>Avance por grupo</h2>
+          <h2>Avance por promoción</h2>
           {cfg.groups.map((g) => {
             const ps = data.results.filter((r) => r.group_id === g.id)
             const done = ps.filter((r) => r.estado === 'completo').length
             const meas = ps.reduce((a, r) => a + r.n_measurements, 0)
             return (
               <div key={g.id}>
-                <div className="bar-row"><span>Grupo {g.code}</span><Bar value={meas} total={ps.length * 5} />
-                  <span className="pct">{ps.length ? Math.round((meas / (ps.length * 5)) * 100) : 0}%</span></div>
-                <small className="muted">{done}/{ps.length} completos · rango {pad(g.range_start)}–{pad(g.range_end)}</small>
+                <div className="bar-row"><span>{g.code}</span><Bar value={meas} total={ps.length * N_VARS} />
+                  <span className="pct">{ps.length ? Math.round((meas / (ps.length * N_VARS)) * 100) : 0}%</span></div>
+                <small className="muted">{done}/{ps.length} completos</small>
               </div>
             )
           })}
@@ -59,12 +59,12 @@ export default function Dashboard() {
         </div>
 
         <div className="card">
-          <h2>Avance por estación</h2>
+          <h2>Avance por medición</h2>
           {cfg.groups.filter((g) => data.results.some((r) => r.group_id === g.id)).map((g) => {
             const ps = data.results.filter((r) => r.group_id === g.id)
             return (
               <div key={g.id} style={{ marginBottom: '.6rem' }}>
-                <strong>Grupo {g.code}</strong>
+                <strong>{g.code}</strong>
                 {VARIABLES.map((v) => {
                   const n = ps.filter((p) => has.has(p.id + v.key)).length
                   return <div className="bar-row" key={v.key}><span className="muted">{v.short}</span><Bar value={n} total={ps.length} /><span className="pct">{n}/{ps.length}</span></div>
@@ -72,18 +72,16 @@ export default function Dashboard() {
               </div>
             )
           })}
-          <small className="muted">La estación con menor avance en un grupo indica un posible cuello de botella.</small>
+          <small className="muted">La medición con menor avance indica un posible cuello de botella.</small>
         </div>
       </div>
 
       <div className="card">
         <h2>Evaluadores</h2>
         <div className="table-wrap"><table>
-          <thead><tr><th>Código</th><th>Nombre</th><th>Grupo</th><th>Estación</th><th className="num">Registros</th><th className="num">Últimos 15 min</th></tr></thead>
+          <thead><tr><th>Usuario</th><th>Nombre</th><th className="num">Registros</th><th className="num">Últimos 15 min</th></tr></thead>
           <tbody>{evaluators.map((p) => (
-            <tr key={p.id}><td>{p.code}</td><td>{p.display_name}</td><td>{cfg.groups.find((g) => g.id === p.group_id)?.code ?? '—'}</td>
-              <td>{STATIONS.find((s) => s.key === p.station)?.label ?? '—'}</td>
-              <td className="num">{total.get(p.id) ?? 0}</td><td className="num">{recent.get(p.id) ?? 0}</td></tr>
+            <tr key={p.id}><td>{p.code}</td><td>{p.display_name}</td><td className="num">{total.get(p.id) ?? 0}</td><td className="num">{recent.get(p.id) ?? 0}</td></tr>
           ))}</tbody>
         </table></div>
       </div>

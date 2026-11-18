@@ -25,8 +25,8 @@ export default function Login() {
         <form onSubmit={submit}>
           {error && <div className="alert err">{error}</div>}
           <div className="field">
-            <label htmlFor="code">Código de acceso</label>
-            <input id="code" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="NUT001"
+            <label htmlFor="code">Usuario</label>
+            <input id="code" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="Su primer nombre"
               autoCapitalize="characters" autoComplete="username" required />
           </div>
           <div className="field">
