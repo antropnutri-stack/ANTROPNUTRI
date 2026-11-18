@@ -49,7 +49,8 @@ select pg_temp.check((select imc from participant_results where number=1)=23.7, 
 select pg_temp.check((select icc from participant_results where number=1)=0.813, 'ICC 0.813');
 select pg_temp.check((select suma_pliegues from participant_results where number=1)=48, 'suma de 4 pliegues 48');
 select pg_temp.check((select estado from participant_results where number=2)='en_proceso', 'en proceso');
-select pg_temp.fails($$select save_measurement(1,'pliegue_bicipital',90)$$, 'FUERA_DE_RANGO', 'rango de pliegue bicipital');
+select pg_temp.check((save_measurement(2,'peso',300))->>'status'='guardado', 'sin rangos: acepta cualquier valor positivo');
+select pg_temp.fails($$select save_measurement(2,'talla',0)$$, 'VALOR_INVALIDO', 'rechaza cero o negativo');
 
 -- volver a medir sigue funcionando
 select create_support_request(1,'remedicion','Lectura dudosa',null,array['peso']::variable[]) as rq \gset
