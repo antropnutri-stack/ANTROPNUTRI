@@ -132,6 +132,13 @@ tr.clickable { cursor: pointer; } tr.clickable:hover { background: var(--crema);
 .var-picker button small { font-weight: 500; opacity: .8; font-size: .8rem; color: inherit; }
 .measuring { background: linear-gradient(90deg, var(--beige), #f7efe4); border-radius: 12px; padding: .6rem .85rem;
   color: var(--cafe-oscuro); border-left: 5px solid var(--acento); font-size: 1.05rem; }
+.matches { display: grid; gap: .4rem; }
+.match { justify-content: flex-start; text-align: left; gap: .9rem; padding: .7rem .9rem; background: #fffaf4; }
+.match strong { font-size: 1.3rem; font-variant-numeric: tabular-nums; }
+.match span { display: flex; flex-direction: column; font-weight: 600; }
+.match small { font-weight: 500; color: var(--texto-suave); }
+.next-btn { width: 100%; margin-top: 1rem; background: var(--beige); border-color: var(--cafe-claro); }
+input.search { font-size: 1.4rem; text-align: left; letter-spacing: 0; font-weight: 700; }
 @media (max-width: 600px) {
   .topbar { gap: .5rem; padding: .5rem .75rem; }
   .topbar .who, .topbar .brand span.txt { display: none; }

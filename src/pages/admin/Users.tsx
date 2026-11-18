@@ -90,6 +90,13 @@ function UserForm({ cfg, target, isPrincipal, onClose, onSaved }: {
     } catch (err) { setError(errorMessage(err)) } finally { setBusy(false) }
   }
 
+  async function deleteUser() {
+    if (!confirm(`¿Borrar la cuenta ${init!.code} (${init!.full_name})? Sus mediciones se conservan. Esta acción no se puede deshacer.`)) return
+    const { data, error } = await supabase.functions.invoke('admin-users', { body: { action: 'delete_user', id: init!.id } })
+    if (error || data?.error) toast.show('err', data?.error ?? (await error?.context?.json?.())?.error ?? error?.message)
+    else onSaved()
+  }
+
   async function resetPassword() {
     const pw = prompt('Nueva contraseña (mínimo 3 caracteres):')
     if (!pw) return
@@ -128,6 +135,8 @@ function UserForm({ cfg, target, isPrincipal, onClose, onSaved }: {
         <div className="row">
           <button className="primary grow" disabled={busy}>{busy ? 'Guardando…' : 'Guardar'}</button>
           {!isNew && <button type="button" onClick={() => void resetPassword()}>Restablecer contraseña</button>}
+          {!isNew && init!.role !== 'principal' && (init!.role === 'evaluador' || isPrincipal) && (
+            <button type="button" className="danger" onClick={() => void deleteUser()}>Borrar cuenta</button>)}
           <button type="button" onClick={onClose}>Cancelar</button>
         </div>
       </form>

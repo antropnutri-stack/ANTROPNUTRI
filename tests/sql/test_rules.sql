@@ -43,7 +43,9 @@ select pg_temp.check((save_measurement(1,'peso',68.5))->>'status'='guardado', 'p
 select save_measurement(1,'talla',170), save_measurement(1,'cintura',78), save_measurement(1,'perimetro_braquial',29),
        save_measurement(1,'cadera',96), save_measurement(1,'pliegue_tricipital',12), save_measurement(1,'pliegue_subescapular',14),
        save_measurement(1,'pliegue_suprailiaco',16), save_measurement(1,'pliegue_bicipital',6);
-select pg_temp.check((save_measurement(1,'peso',70))->>'status'='ya_existe', 'no sobrescribe sin autorización');
+select pg_temp.check((save_measurement(1,'peso',70))->>'remedicion'='true', 'repetir una medida la reemplaza sin solicitud');
+select pg_temp.check((select value from measurements m join participants p on p.id=m.participant_id where p.number=1 and m.variable='peso')=70, 'nuevo valor guardado');
+select save_measurement(1,'peso',68.5);
 select pg_temp.check((select estado from participant_results where number=1)='completo', 'completo con 9 mediciones');
 select pg_temp.check((select imc from participant_results where number=1)=23.7, 'IMC 23.7');
 select pg_temp.check((select icc from participant_results where number=1)=0.813, 'ICC 0.813');
@@ -52,17 +54,13 @@ select pg_temp.check((select estado from participant_results where number=2)='en
 select pg_temp.check((save_measurement(2,'peso',300))->>'status'='guardado', 'sin rangos: acepta cualquier valor positivo');
 select pg_temp.fails($$select save_measurement(2,'talla',0)$$, 'VALOR_INVALIDO', 'rechaza cero o negativo');
 
--- volver a medir sigue funcionando
-select create_support_request(1,'remedicion','Lectura dudosa',null,array['peso']::variable[]) as rq \gset
-select pg_temp.as_user('00000000-0000-0000-0000-000000000002');
-select resolve_support_request(:'rq', true);
-select pg_temp.as_user('00000000-0000-0000-0000-0000000000a1');
-select pg_temp.check((save_measurement(1,'peso',69))->>'remedicion'='true', 'cualquier evaluador repite con autorización');
-select pg_temp.check((save_measurement(1,'peso',71))->>'status'='ya_existe', 'autorización de un solo uso');
-
 -- seguridad
 select pg_temp.fails($$insert into measurements(participant_id,variable,value,evaluator_id) select id,'talla',170,'00000000-0000-0000-0000-0000000000a1' from participants limit 1$$, 'row-level security', 'RLS bloquea escritura directa');
 select pg_temp.check((select count(*) from audit_log)=0, 'evaluador no ve auditoría');
+reset role;
+select pg_temp.check((select (details->>'old')::numeric=68.5 and (details->>'new')::numeric=70 from audit_log where action='medicion_repetida' order by id limit 1), 'auditoría guarda valor anterior y nuevo');
+set role authenticated;
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000a2');
 select pg_temp.fails($$select import_participants('[]'::jsonb)$$, 'NO_AUTORIZADO', 'evaluador no importa Excel');
 select pg_temp.as_user('00000000-0000-0000-0000-000000000002');
 select pg_temp.check((import_participants('[{"full_name":"Ana Uno","dni":"44445555","age":19,"group_code":"aguerridos"},{"full_name":"Mal","age":20,"group_code":"OTRA"}]'))->>'inserted'='1', 'importa con promoción y reporta error');
@@ -70,3 +68,13 @@ reset role; update profiles set status='suspendida' where code='BILL'; set role 
 select pg_temp.as_user('00000000-0000-0000-0000-0000000000a2');
 select pg_temp.fails($$select save_measurement(2,'peso',60)$$, 'NO_AUTORIZADO', 'cuenta suspendida no registra');
 select pg_temp.check((select count(*) from participants)=0, 'cuenta suspendida no ve datos');
+
+-- borrar participantes y cuentas
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000a1');
+select pg_temp.fails($$select delete_participant((select id from participants where number=2))$$, 'NO_AUTORIZADO', 'evaluador no borra participantes');
+select pg_temp.as_user('00000000-0000-0000-0000-000000000002');
+select delete_participant((select id from participants where number=2), 'duplicado');
+select pg_temp.check((select count(*) from participants where number=2)=0, 'administrador borra participante');
+reset role;
+delete from auth.users where email='bill@antropnutri.local';
+select pg_temp.check((select count(*) from measurements where evaluator_id is null) > 0, 'borrar evaluador conserva sus mediciones');

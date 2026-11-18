@@ -4,16 +4,15 @@ import { fetchAll, useConfig, useLive, useQueue } from '../lib/hooks'
 import { discardOp, retryOp } from '../lib/offlineQueue'
 import { normName } from '../lib/calc'
 import { N_VARS, REQUEST_TYPE_LABEL, VARIABLES, pad, varLabel,
-  type Measurement, type Participant, type SupportRequest, type Variable } from '../lib/types'
+  type Measurement, type Participant, type SupportRequest } from '../lib/types'
 import { MeasureForm, cacheParticipants } from '../components/MeasureForm'
 import { RegisterParticipant } from '../components/RegisterParticipant'
-import { SupportRequestForm } from '../components/SupportRequestForm'
 import { Bar, Modal, Stat, StatusBadge, useToast } from '../components/ui'
 
 export default function EvaluatorHome() {
   const { profile } = useAuth()
   const { data: cfg } = useConfig()
-  const [support, setSupport] = useState<{ number?: number; type?: 'remedicion'; variable?: Variable } | null>(null)
+  const [openNumber, setOpenNumber] = useState<number | null>(null)
   const [registering, setRegistering] = useState(false)
   const queue = useQueue()
   const toast = useToast()
@@ -53,13 +52,14 @@ export default function EvaluatorHome() {
       <QueuePanel queue={queue} />
 
       <MeasureForm campaignId={campaignId ?? ''} variables={VARIABLES.map((v) => v.key)} ranges={cfg.ranges} profiles={cfg.profiles}
-        groupCode={groupCode} onRequestSupport={(n, o) => setSupport({ number: n, ...o })} />
+        groupCode={groupCode} openNumber={openNumber} onOpened={() => setOpenNumber(null)} />
 
       <div className="row" style={{ marginBottom: '1rem' }}>
         <button className="big" onClick={() => setRegistering(true)}>+ Registrar participante</button>
       </div>
 
-      {data && <ParticipantsTable participants={participants} measurements={measurements} groupCode={groupCode} />}
+      {data && <ParticipantsTable participants={participants} measurements={measurements} groupCode={groupCode}
+        onPick={(n) => { setOpenNumber(n); window.scrollTo({ top: 0, behavior: 'smooth' }) }} />}
 
       <MyRequests requests={data?.requests.filter((r) => r.requested_by === profile.id) ?? []} participants={participants} />
 
@@ -67,12 +67,6 @@ export default function EvaluatorHome() {
         <Modal title="Registrar participante" onClose={() => setRegistering(false)}>
           <RegisterParticipant groups={cfg.groups} />
         </Modal>
-      )}
-      {support && (
-        <SupportRequestForm groups={cfg.groups} ownGroupId={null} initialNumber={support.number}
-          initialType={support.type} initialVariable={support.variable}
-          onClose={() => setSupport(null)}
-          onDone={() => { setSupport(null); toast.show('ok', 'Solicitud enviada a los administradores.') }} />
       )}
     </div>
   )
@@ -99,8 +93,8 @@ function QueuePanel({ queue }: { queue: ReturnType<typeof useQueue> }) {
   )
 }
 
-function ParticipantsTable({ participants, measurements, groupCode }: {
-  participants: Participant[]; measurements: Measurement[]; groupCode: (id: string) => string
+function ParticipantsTable({ participants, measurements, groupCode, onPick }: {
+  participants: Participant[]; measurements: Measurement[]; groupCode: (id: string) => string; onPick: (n: number) => void
 }) {
   const [filter, setFilter] = useState<'pendientes' | 'todos'>('pendientes')
   const [q, setQ] = useState('')
@@ -117,7 +111,7 @@ function ParticipantsTable({ participants, measurements, groupCode }: {
 
   return (
     <div className="card">
-      <div className="row"><h2 className="grow">Participantes</h2>
+      <div className="row"><h2 className="grow">Participantes</h2><small className="muted">Toque uno para registrar sus medidas</small>
         <select style={{ width: 'auto' }} value={filter} onChange={(e) => setFilter(e.target.value as 'todos')}>
           <option value="pendientes">Pendientes</option><option value="todos">Todos</option>
         </select></div>
@@ -125,7 +119,7 @@ function ParticipantsTable({ participants, measurements, groupCode }: {
       <div className="table-wrap" style={{ maxHeight: '60vh' }}><table>
         <thead><tr><th>N.º</th><th>Nombre</th><th>Promoción</th>{VARIABLES.map((v) => <th key={v.key} title={v.label}>{v.short}</th>)}<th>Estado</th></tr></thead>
         <tbody>{rows.map(({ p, estado }) => (
-          <tr key={p.id}><td><strong>{pad(p.number)}</strong></td><td>{p.full_name}</td><td>{groupCode(p.group_id)}</td>
+          <tr key={p.id} className="clickable" onClick={() => onPick(p.number)}><td><strong>{pad(p.number)}</strong></td><td>{p.full_name}</td><td>{groupCode(p.group_id)}</td>
             {VARIABLES.map((v) => <td key={v.key}>{by.get(p.id)?.has(v.key) ? '✓' : '·'}</td>)}
             <td><StatusBadge estado={estado} /></td>
           </tr>))}

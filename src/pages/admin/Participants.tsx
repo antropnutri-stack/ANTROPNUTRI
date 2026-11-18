@@ -112,7 +112,11 @@ function ParticipantDetail({ r, cfg, measurements, onClose, onChange }: {
       <p className="muted" style={{ marginTop: '.6rem' }}>IMC: {r.imc ?? '—'} {r.imc_clasificacion ? `(${r.imc_clasificacion})` : ''} · RCT: {r.rct ?? '—'} · ICC: {r.icc ?? '—'} · CMB estimada: {r.cmb ?? '—'} cm · Σ 4 pliegues: {r.suma_pliegues ?? '—'} mm</p>
 
       <div className="row" style={{ marginTop: '1rem' }}>
-        {can('can_manage_participants') && !edit && <button onClick={() => setEdit(true)}>Editar identificación</button>}
+        {can('can_manage_participants') && !edit && <button onClick={() => setEdit(true)}>Editar datos</button>}
+        <button className="danger" onClick={() => {
+          if (!confirm(`¿Borrar al participante ${pad(r.number)} (${r.full_name}) y todas sus medidas? Esta acción no se puede deshacer.`)) return
+          void run('delete_participant', { p_id: r.id, p_reason: 'Borrado por administración' }, 'Participante borrado').then(onClose)
+        }}>Borrar participante</button>
         <button onClick={() => { const note = r.needs_review ? null : ask('Motivo de la revisión:'); if (r.needs_review || note) void run('set_review', { p_id: r.id, p_needs_review: !r.needs_review, p_note: note }, 'Estado actualizado') }}>
           {r.needs_review ? 'Marcar revisión resuelta' : 'Marcar «requiere revisión»'}</button>
         {can('can_change_group') && (

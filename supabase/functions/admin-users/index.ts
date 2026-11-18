@@ -63,6 +63,18 @@ Deno.serve(async (req) => {
       await admin.from('audit_log').insert({ actor_id: caller.id, action: 'contraseña_restablecida', entity: 'profile', entity_id: body.id, details: {} })
       return json({ ok: true })
     }
+    if (body.action === 'delete_user') {
+      if (body.id === caller.id) return json({ error: 'No puede borrar su propia cuenta' }, 400)
+      const { data: target } = await admin.from('profiles').select('role, code').eq('id', body.id).single()
+      if (!target) return json({ error: 'No encontrado' }, 404)
+      if (target.role === 'principal') return json({ error: 'La cuenta principal no se puede borrar' }, 403)
+      if (target.role === 'admin' && !isPrincipal) return json({ error: 'Solo el administrador principal borra administradores' }, 403)
+      if (target.role === 'evaluador' && !canEvaluators) return json({ error: 'Sin permiso para borrar evaluadores' }, 403)
+      const { error } = await admin.auth.admin.deleteUser(body.id)
+      if (error) return json({ error: error.message }, 400)
+      await admin.from('audit_log').insert({ actor_id: caller.id, action: 'cuenta_eliminada', entity: 'profile', entity_id: body.id, details: { code: target.code, role: target.role } })
+      return json({ ok: true })
+    }
     return json({ error: 'Acción desconocida' }, 400)
   } catch (e) {
     return json({ error: (e as Error).message }, 500)

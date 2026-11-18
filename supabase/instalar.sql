@@ -1271,6 +1271,123 @@ revoke execute on function next_number(uuid) from authenticated;
 -- ANTROPNUTRI · Solo recolección de datos: sin rangos de plausibilidad ni avisos de valor inusual
 update plausibility_ranges set hard_min = 0.1, warn_min = 0.1, warn_max = 999, hard_max = 999;
 
+-- >>> supabase/migrations/0007_reemplazo_libre.sql
+-- ANTROPNUTRI · Repetir una medición ya registrada sin solicitud:
+-- el nuevo valor reemplaza al anterior y la auditoría conserva ambos.
+create or replace function save_measurement(
+  p_participant_number int,
+  p_variable variable,
+  p_value numeric,
+  p_confirm_unusual boolean default false,
+  p_client_op_id uuid default null,
+  p_recorded_at timestamptz default null
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  u profiles;
+  part participants;
+  rng plausibility_ranges;
+  existing measurements;
+  unusual boolean;
+  new_id uuid;
+begin
+  select * into u from profiles where id = auth.uid() and status = 'activa';
+  if not found then raise exception 'NO_AUTORIZADO: cuenta inactiva o inexistente'; end if;
+
+  -- Idempotencia (reenvíos sin conexión)
+  if p_client_op_id is not null then
+    select * into existing from measurements where client_op_id = p_client_op_id;
+    if found then
+      return jsonb_build_object('status','ya_guardado','id',existing.id,'value',existing.value);
+    end if;
+  end if;
+
+  select * into part from participants
+   where campaign_id = active_campaign() and number = p_participant_number;
+  if not found then raise exception 'NO_ENCONTRADO: participante % no registrado', p_participant_number; end if;
+
+  if u.role in ('principal','admin') and not has_perm('register_measurements') then
+    raise exception 'NO_AUTORIZADO: su cuenta no tiene habilitado el registro de mediciones';
+  end if;
+
+  select * into rng from plausibility_ranges where variable = p_variable;
+  if p_value is null or p_value <= 0 then raise exception 'VALOR_INVALIDO: debe ser un número positivo'; end if;
+  if p_value < rng.hard_min or p_value > rng.hard_max then
+    raise exception 'FUERA_DE_RANGO: % % está fuera del rango admisible (% – %)', p_value, rng.unit, rng.hard_min, rng.hard_max;
+  end if;
+  unusual := p_value < rng.warn_min or p_value > rng.warn_max;
+  if unusual and not coalesce(p_confirm_unusual, false) then
+    return jsonb_build_object('status','requiere_confirmacion','warn_min',rng.warn_min,'warn_max',rng.warn_max,'unit',rng.unit);
+  end if;
+
+  select * into existing from measurements where participant_id = part.id and variable = p_variable for update;
+  if found then
+    update measurements set value = round(p_value, rng.decimals), is_unusual = unusual,
+      evaluator_id = u.id, client_op_id = coalesce(p_client_op_id, client_op_id),
+      recorded_at = coalesce(p_recorded_at, now()), updated_at = now()
+    where id = existing.id;
+    perform audit('medicion_repetida', 'measurement', existing.id,
+      jsonb_build_object('participant', part.number, 'variable', p_variable,
+                         'old', existing.value, 'old_evaluator', existing.evaluator_id, 'new', p_value));
+    return jsonb_build_object('status','guardado','id',existing.id,'remedicion',true,'old_value',existing.value);
+  end if;
+
+  insert into measurements(participant_id, variable, value, is_unusual, evaluator_id, client_op_id, recorded_at)
+  values (part.id, p_variable, round(p_value, rng.decimals), unusual, u.id,
+          p_client_op_id, coalesce(p_recorded_at, now()))
+  on conflict (participant_id, variable) do update
+    set value = excluded.value, evaluator_id = excluded.evaluator_id, updated_at = now()
+  returning id into new_id;
+
+  perform audit('medicion_registrada', 'measurement', new_id,
+    jsonb_build_object('participant', part.number, 'variable', p_variable, 'value', p_value));
+
+  return jsonb_build_object('status','guardado','id',new_id,'unusual',unusual);
+end $$;
+
+revoke execute on function save_measurement(int, variable, numeric, boolean, uuid, timestamptz) from anon, public;
+grant execute on function save_measurement(int, variable, numeric, boolean, uuid, timestamptz) to authenticated;
+
+-- >>> supabase/migrations/0008_borrar_participantes_y_cuentas.sql
+-- ANTROPNUTRI · Administradores pueden borrar participantes y cuentas.
+-- Al borrar una cuenta, sus mediciones y registros se conservan (responsable = vacío).
+
+alter table measurements alter column evaluator_id drop not null;
+alter table support_requests alter column requested_by drop not null;
+
+alter table measurements drop constraint if exists measurements_evaluator_id_fkey;
+alter table measurements add constraint measurements_evaluator_id_fkey
+  foreign key (evaluator_id) references profiles(id) on delete set null;
+alter table audit_log drop constraint if exists audit_log_actor_id_fkey;
+alter table audit_log add constraint audit_log_actor_id_fkey
+  foreign key (actor_id) references profiles(id) on delete set null;
+alter table participants drop constraint if exists participants_created_by_fkey;
+alter table participants add constraint participants_created_by_fkey
+  foreign key (created_by) references profiles(id) on delete set null;
+alter table support_requests drop constraint if exists support_requests_requested_by_fkey;
+alter table support_requests add constraint support_requests_requested_by_fkey
+  foreign key (requested_by) references profiles(id) on delete set null;
+alter table support_requests drop constraint if exists support_requests_resolved_by_fkey;
+alter table support_requests add constraint support_requests_resolved_by_fkey
+  foreign key (resolved_by) references profiles(id) on delete set null;
+
+-- Borrar participante (y sus mediciones). Queda una copia en la auditoría.
+create or replace function delete_participant(p_id uuid, p_reason text default null)
+returns void language plpgsql security definer set search_path = public as $$
+declare old participants; ms jsonb;
+begin
+  if not is_admin() then raise exception 'NO_AUTORIZADO: solo administradores'; end if;
+  select * into old from participants where id = p_id for update;
+  if not found then raise exception 'NO_ENCONTRADO'; end if;
+  select coalesce(jsonb_object_agg(variable, value), '{}') into ms from measurements where participant_id = p_id;
+  delete from participants where id = p_id;
+  perform audit('participante_eliminado', 'participant', p_id,
+    jsonb_build_object('number', old.number, 'full_name', old.full_name, 'dni', old.dni, 'mediciones', ms, 'reason', p_reason));
+end $$;
+
+revoke execute on function delete_participant(uuid, text) from anon, public;
+grant execute on function delete_participant(uuid, text) to authenticated;
+
 
 insert into campaigns (name, event_date, is_active)
 values ('Evaluación antropométrica 2026', current_date, true);
